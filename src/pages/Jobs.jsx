@@ -1,0 +1,342 @@
+import { useState, useEffect } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+
+// Premium mock data generator with detailed job descriptions
+const generateMockJobs = (query, location, category) => {
+    const baseJobs = [
+        { id: 1, title: 'Store Manager', company: 'Volt Retail Inc.', location: 'New York, NY', type: 'Full-time', pay: '$25/hr', urgent: true, new: true, category: 'Retail & Sales', logoSeed: 'Volt', posted: '2 hours ago', applicants: 12 },
+        { id: 2, title: 'Senior Barista', company: 'Neon Coffee', location: 'Brooklyn, NY', type: 'Part-time', pay: '$18/hr', urgent: false, new: true, category: 'Restaurant & Food', logoSeed: 'Neon', posted: '5 hours ago', applicants: 34 },
+        { id: 3, title: 'Warehouse Supervisor', company: 'Prime Logistics', location: 'Newark, NJ', type: 'Full-time', pay: '$22/hr', urgent: true, new: false, category: 'Warehouse', logoSeed: 'Prime', posted: '1 day ago', applicants: 8 },
+        { id: 4, title: 'Delivery Fleet Driver', company: 'QuickShip', location: 'Queens, NY', type: 'Contract', pay: '$20/hr', urgent: false, new: false, category: 'Delivery & Driver', logoSeed: 'Quick', posted: '2 days ago', applicants: 45 },
+        { id: 5, title: 'Customer Success Specialist', company: 'TechFix Solutions', location: 'Remote', type: 'Full-time', pay: '$24/hr', urgent: true, new: true, category: 'Customer Support', logoSeed: 'Tech', posted: '30 mins ago', applicants: 3 },
+        { id: 6, title: 'Event Coordinator', company: 'City Events LLC', location: 'Manhattan, NY', type: 'Temporary', pay: '$30/hr', urgent: false, new: false, category: 'Events', logoSeed: 'City', posted: '3 days ago', applicants: 89 },
+        { id: 7, title: 'Boutique Sales Associate', company: 'Aura Fashion', location: 'SoHo, NY', type: 'Part-time', pay: '$19/hr', urgent: false, new: true, category: 'Retail & Sales', logoSeed: 'Aura', posted: '4 hours ago', applicants: 21 },
+        { id: 8, title: 'Line Cook / Chef', company: 'Midnight Burger', location: 'Bronx, NY', type: 'Full-time', pay: '$21/hr', urgent: true, new: false, category: 'Restaurant & Food', logoSeed: 'Midnight', posted: '12 hours ago', applicants: 5 },
+    ];
+
+    let filtered = baseJobs;
+
+    if (query) {
+        const q = query.toLowerCase();
+        filtered = filtered.filter(j =>
+            j.title.toLowerCase().includes(q) ||
+            j.company.toLowerCase().includes(q)
+        );
+    }
+
+    if (location) {
+        const l = location.toLowerCase();
+        filtered = filtered.filter(j => j.location.toLowerCase().includes(l));
+    }
+
+    if (category) {
+        const c = category.toLowerCase();
+        filtered = filtered.filter(j => j.category.toLowerCase() === c);
+    }
+
+    // Multiply the results if it's too few, just to make the UI look populated and impressive
+    if (filtered.length > 0 && filtered.length < 6) {
+        const clones = filtered.map(j => ({ ...j, id: j.id + 100, urgent: false, new: false, posted: '3 days ago' }));
+        filtered = [...filtered, ...clones];
+    }
+
+    return filtered;
+};
+
+export default function Jobs() {
+    const [searchParams, setSearchParams] = useSearchParams();
+    const navigate = useNavigate();
+
+    // Controlled inputs for the search bar
+    const [queryInput, setQueryInput] = useState(searchParams.get('q') || '');
+    const [locationInput, setLocationInput] = useState(searchParams.get('loc') || '');
+    const categoryParam = searchParams.get('category');
+
+    const [jobs, setJobs] = useState([]);
+    const [isSearching, setIsSearching] = useState(true);
+
+    // Filter states
+    const [activeFilters, setActiveFilters] = useState({
+        type: new Set(),
+        distance: 'Within 15 miles'
+    });
+
+    useEffect(() => {
+        setIsSearching(true);
+        // Simulate a sophisticated matching algorithm delay to show loading state
+        const timer = setTimeout(() => {
+            let results = generateMockJobs(searchParams.get('q'), searchParams.get('loc'), categoryParam);
+
+            // Apply mock frontend filters
+            if (activeFilters.type.size > 0) {
+                results = results.filter(j => activeFilters.type.has(j.type));
+            }
+
+            setJobs(results);
+            setIsSearching(false);
+        }, 800);
+        return () => clearTimeout(timer);
+    }, [searchParams, categoryParam, activeFilters]);
+
+    const handleSearch = (e) => {
+        e.preventDefault();
+        const params = new URLSearchParams();
+        if (queryInput) params.set('q', queryInput);
+        if (locationInput) params.set('loc', locationInput);
+        if (categoryParam) params.set('category', categoryParam);
+        setSearchParams(params);
+    };
+
+    const clearFilters = () => {
+        setQueryInput('');
+        setLocationInput('');
+        setActiveFilters({ type: new Set(), distance: 'Within 15 miles' });
+        setSearchParams(new URLSearchParams());
+    };
+
+    const toggleTypeFilter = (type) => {
+        const newSet = new Set(activeFilters.type);
+        if (newSet.has(type)) newSet.delete(type);
+        else newSet.add(type);
+        setActiveFilters({ ...activeFilters, type: newSet });
+    };
+
+    return (
+        <div className="min-h-screen text-white pb-32 pt-24 relative overflow-hidden">
+
+            {/* Ambient Background Globs */}
+            <div className="absolute top-0 right-[10%] w-[600px] h-[600px] bg-[#CF9EFF] opacity-[0.06] blur-[150px] rounded-full mix-blend-screen pointer-events-none"></div>
+            <div className="absolute top-[40%] left-[-10%] w-[500px] h-[500px] bg-[#5CB144] opacity-[0.04] blur-[150px] rounded-full mix-blend-screen pointer-events-none"></div>
+
+            {/* Header Area */}
+            <div className="max-w-7xl mx-auto px-6 mb-16 relative z-20">
+                <h1 className="text-5xl md:text-7xl font-bold mb-6 tracking-tight">
+                    {categoryParam ? (
+                        <>Opportunities in <span className="text-[#CF9EFF]">{categoryParam}</span></>
+                    ) : (
+                        <>Find your next <span className="text-[#CF9EFF]">great role.</span></>
+                    )}
+                </h1>
+                <p className="text-xl text-gray-400 mb-10 max-w-2xl">
+                    Discover thousands of local opportunities offering instant hiring and competitive pay in your area.
+                </p>
+
+                {/* Premium Search Bar */}
+                <form onSubmit={handleSearch} className="w-full bg-white/5 backdrop-blur-3xl border border-white/10 rounded-[30px] p-2 md:p-3 shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col md:flex-row gap-3 relative z-20 hover:border-white/20 transition-colors duration-500">
+
+                    <div className="flex-1 flex items-center bg-black/60 rounded-[22px] px-5 py-4 md:py-0 border border-transparent focus-within:border-[#CF9EFF]/40 focus-within:shadow-[0_0_20px_rgba(207,158,255,0.1)] transition-all duration-300">
+                        <span className="text-[#CF9EFF] mr-4 text-xl">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z" /></svg>
+                        </span>
+                        <div className="flex-1 text-left">
+                            <label className="block text-[10px] font-bold text-[#CF9EFF]/70 uppercase tracking-widest mb-0.5">What are you looking for?</label>
+                            <input
+                                type="text"
+                                value={queryInput}
+                                onChange={(e) => setQueryInput(e.target.value)}
+                                placeholder="Job title, keywords, or company..."
+                                className="w-full bg-transparent text-white focus:outline-none text-base md:text-lg placeholder-gray-500 font-medium"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex-1 flex items-center bg-black/60 rounded-[22px] px-5 py-4 md:py-0 border border-transparent focus-within:border-[#5CB144]/40 focus-within:shadow-[0_0_20px_rgba(92,177,68,0.1)] transition-all duration-300">
+                        <span className="text-[#5CB144] mr-4 text-xl">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16"><path d="M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10zm0-7a3 3 0 1 1 0-6 3 3 0 0 1 0 6z" /></svg>
+                        </span>
+                        <div className="flex-1 text-left">
+                            <label className="block text-[10px] font-bold text-[#5CB144]/70 uppercase tracking-widest mb-0.5">Where do you want to work?</label>
+                            <input
+                                type="text"
+                                value={locationInput}
+                                onChange={(e) => setLocationInput(e.target.value)}
+                                placeholder="City, neighborhood, or zip..."
+                                className="w-full bg-transparent text-white focus:outline-none text-base md:text-lg placeholder-gray-500 font-medium"
+                            />
+                        </div>
+                    </div>
+
+                    <button
+                        type="submit"
+                        className="bg-[#CF9EFF] hover:bg-[#b880f0] text-black font-extrabold py-5 md:py-0 px-10 rounded-[22px] transition-all shadow-lg shadow-[#CF9EFF]/20 md:w-auto w-full text-lg hover:shadow-[#CF9EFF]/40 hover:scale-[1.02]"
+                    >
+                        Search Jobs
+                    </button>
+                </form>
+
+                {/* Active Applied Filters Indicators */}
+                {(searchParams.get('q') || searchParams.get('loc') || categoryParam || activeFilters.type.size > 0) && (
+                    <div className="mt-6 flex flex-wrap items-center gap-3 text-sm text-gray-400 bg-white/5 backdrop-blur-md inline-flex px-4 py-2 rounded-2xl border border-white/10">
+                        <span className="font-semibold mr-1">Active Filters:</span>
+                        {searchParams.get('q') && <span className="bg-white/10 px-3 py-1 rounded-full text-white font-medium border border-white/5">{searchParams.get('q')}</span>}
+                        {searchParams.get('loc') && <span className="bg-white/10 px-3 py-1 rounded-full text-white font-medium border border-white/5">{searchParams.get('loc')}</span>}
+                        {categoryParam && <span className="bg-[#CF9EFF]/20 text-[#CF9EFF] border border-[#CF9EFF]/30 px-3 py-1 rounded-full font-medium">{categoryParam}</span>}
+                        {Array.from(activeFilters.type).map(t => (
+                            <span key={t} className="bg-white/10 px-3 py-1 rounded-full text-white font-medium border border-white/5">{t}</span>
+                        ))}
+                        <button onClick={clearFilters} className="text-[#CF9EFF] hover:text-white transition font-semibold ml-2 hover:underline">
+                            Clear All
+                        </button>
+                    </div>
+                )}
+            </div>
+
+            {/* Main Content Layout */}
+            <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-4 gap-10 relative z-10">
+
+                {/* Sidebar Filters - Glass Cards */}
+                <div className="hidden lg:block space-y-6">
+                    <div className="bg-[#0a0a0a]/80 backdrop-blur-2xl border border-white/10 p-7 rounded-[30px] hover:border-white/20 transition-colors">
+                        <h3 className="font-bold text-lg mb-5 text-white flex items-center justify-between">
+                            Job Type
+                            <span className="text-gray-500 text-xs font-normal">Optional</span>
+                        </h3>
+                        <div className="space-y-4">
+                            {['Full-time', 'Part-time', 'Contract', 'Temporary'].map(type => (
+                                <label key={type} className="flex items-center gap-4 cursor-pointer group">
+                                    <div className={`w-6 h-6 rounded-lg border flex items-center justify-center transition-all ${activeFilters.type.has(type) ? 'border-[#CF9EFF] bg-[#CF9EFF]/10' : 'border-white/20 group-hover:border-[#CF9EFF]/50'}`}>
+                                        <div className={`w-3 h-3 rounded-[3px] bg-[#CF9EFF] transition-transform duration-300 ${activeFilters.type.has(type) ? 'scale-100' : 'scale-0'}`}></div>
+                                    </div>
+                                    <span className={`transition-colors ${activeFilters.type.has(type) ? 'text-white font-medium' : 'text-gray-400 group-hover:text-gray-200'}`}>{type}</span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="bg-[#0a0a0a]/80 backdrop-blur-2xl border border-white/10 p-7 rounded-[30px] hover:border-white/20 transition-colors">
+                        <h3 className="font-bold text-lg mb-5 text-white">Distance</h3>
+                        <div className="space-y-4">
+                            {['Exact location', 'Within 5 miles', 'Within 15 miles', 'Within 25 miles'].map((dist) => {
+                                const isActive = activeFilters.distance === dist;
+                                return (
+                                    <label key={dist} onClick={() => setActiveFilters({ ...activeFilters, distance: dist })} className="flex items-center gap-4 cursor-pointer group">
+                                        <div className={`w-6 h-6 rounded-full border flex items-center justify-center transition-all ${isActive ? 'border-[#5CB144]' : 'border-white/20 group-hover:border-[#5CB144]/50'}`}>
+                                            <div className={`w-3 h-3 rounded-full bg-[#5CB144] transition-transform duration-300 ${isActive ? 'scale-100' : 'scale-0'}`}></div>
+                                        </div>
+                                        <span className={`transition-colors ${isActive ? 'text-white font-medium' : 'text-gray-400 group-hover:text-gray-200'}`}>{dist}</span>
+                                    </label>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Job Listings Column */}
+                <div className="lg:col-span-3">
+
+                    {/* Header Controls */}
+                    <div className="flex justify-between items-end mb-6 border-b border-white/10 pb-4">
+                        <p className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-500">
+                            {isSearching ? 'Scanning network...' : `${jobs.length} Matches Found`}
+                        </p>
+                        {!isSearching && jobs.length > 0 && (
+                            <select className="bg-white/5 border border-white/10 text-white rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-[#CF9EFF]/50 cursor-pointer">
+                                <option className="bg-[#111]">Sort by Relevance</option>
+                                <option className="bg-[#111]">Sort by Date (Newest)</option>
+                                <option className="bg-[#111]">Sort by Pay (Highest)</option>
+                            </select>
+                        )}
+                    </div>
+
+                    {/* Listings */}
+                    <div className="space-y-5">
+                        {isSearching ? (
+                            // Skeleton Loading State
+                            Array(4).fill(0).map((_, i) => (
+                                <div key={i} className="bg-white/5 border border-white/5 rounded-[30px] p-6 h-40 animate-pulse flex items-center">
+                                    <div className="w-16 h-16 bg-white/10 rounded-2xl mr-6"></div>
+                                    <div className="flex-1 space-y-4">
+                                        <div className="h-6 bg-white/10 rounded w-1/3"></div>
+                                        <div className="h-4 bg-white/10 rounded w-1/4"></div>
+                                        <div className="h-4 bg-white/10 rounded w-1/2"></div>
+                                    </div>
+                                </div>
+                            ))
+                        ) : jobs.length > 0 ? (
+                            jobs.map((job) => (
+                                <div
+                                    key={job.id}
+                                    onClick={() => navigate('/login')}
+                                    className="group relative bg-[#0a0a0a]/90 backdrop-blur-2xl border border-white/10 rounded-[30px] p-6 sm:p-8 cursor-pointer overflow-hidden transition-all duration-500 hover:-translate-y-1 hover:border-[#CF9EFF]/40 hover:shadow-[0_20px_50px_-10px_rgba(207,158,255,0.15)]"
+                                >
+                                    {/* Subtly glowing backplate visible on hover */}
+                                    <div className="absolute inset-0 bg-gradient-to-r from-[#CF9EFF]/0 via-[#CF9EFF]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"></div>
+
+                                    <div className="relative z-10 flex flex-col sm:flex-row gap-6">
+                                        {/* Logo / Company Avatar */}
+                                        <div className="w-16 h-16 shrink-0 bg-[#111] border border-white/5 rounded-2xl flex items-center justify-center overflow-hidden shadow-inner group-hover:border-white/20 transition-colors">
+                                            <img src={`https://api.dicebear.com/9.x/initials/svg?seed=${job.logoSeed}&backgroundColor=111111&textColor=ffffff`} alt={job.company} className="w-full h-full object-cover" />
+                                        </div>
+
+                                        {/* Main Details */}
+                                        <div className="flex-1">
+                                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-2 gap-4">
+                                                <div>
+                                                    <h3 className="text-2xl font-bold text-white group-hover:text-[#CF9EFF] transition-colors duration-300">{job.title}</h3>
+                                                    <p className="text-gray-400 font-medium text-lg mt-1">{job.company}</p>
+                                                </div>
+
+                                                {/* Badges */}
+                                                <div className="flex gap-2 shrink-0">
+                                                    {job.new && (
+                                                        <span className="bg-[#CF9EFF]/10 text-[#CF9EFF] text-xs font-bold px-3 py-1.5 rounded-full border border-[#CF9EFF]/20 uppercase tracking-wide">
+                                                            New
+                                                        </span>
+                                                    )}
+                                                    {job.urgent && (
+                                                        <span className="bg-[#5CB144]/10 text-[#5CB144] text-xs font-bold px-3 py-1.5 rounded-full border border-[#5CB144]/20 uppercase tracking-wide flex items-center gap-1.5">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-[#5CB144] animate-pulse"></span> Urgent
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Attributes list */}
+                                            <div className="flex flex-wrap gap-2 mt-5 mb-6">
+                                                <div className="bg-white/5 border border-white/5 px-3 py-1.5 rounded-xl text-sm text-gray-300 flex items-center gap-2 group-hover:bg-white/10 transition-colors">
+                                                    <span className="text-gray-500">📍</span> {job.location}
+                                                </div>
+                                                <div className="bg-white/5 border border-white/5 px-3 py-1.5 rounded-xl text-sm text-gray-300 flex items-center gap-2 group-hover:bg-white/10 transition-colors">
+                                                    <span className="text-gray-500">💼</span> {job.type}
+                                                </div>
+                                                <div className="bg-white/5 border border-white/5 px-3 py-1.5 rounded-xl font-bold text-[#5CB144] flex items-center gap-2 group-hover:bg-[#5CB144]/10 transition-colors">
+                                                    <span className="text-gray-500 font-normal">💸</span> {job.pay}
+                                                </div>
+                                            </div>
+
+                                            {/* Footer Footer */}
+                                            <div className="flex justify-between items-center pt-4 border-t border-white/5">
+                                                <div className="text-sm text-gray-500 font-medium flex gap-4">
+                                                    <span>⏱ Posted {job.posted}</span>
+                                                    <span className="hidden sm:inline">👥 {job.applicants} applicants</span>
+                                                </div>
+
+                                                {/* Action Button that slides in / becomes vibrant on hover */}
+                                                <div className="flex items-center gap-2 text-[#CF9EFF] font-bold text-sm bg-white/5 px-5 py-2 rounded-xl group-hover:bg-[#CF9EFF] group-hover:text-black transition-all duration-300 transform group-hover:scale-105 shadow-md">
+                                                    Quick Apply <span className="group-hover:translate-x-1 transition-transform">→</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="bg-[#0a0a0a]/80 backdrop-blur-2xl border border-white/10 rounded-[40px] p-16 text-center shadow-2xl">
+                                <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6 border border-white/10">
+                                    <span className="text-4xl filter grayscale opacity-50">🧭</span>
+                                </div>
+                                <h3 className="text-3xl font-bold mb-4">No exact matches found</h3>
+                                <p className="text-gray-400 mb-8 max-w-md mx-auto text-lg">
+                                    We couldn't find any opportunities matching your exact criteria right now. Try adjusting your search keywords or location.
+                                </p>
+                                <button onClick={clearFilters} className="bg-white hover:bg-gray-200 text-black font-bold py-4 px-10 rounded-2xl transition-all shadow-xl text-lg hover:scale-105">
+                                    Clear Search Filters
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
