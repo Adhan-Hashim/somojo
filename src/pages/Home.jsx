@@ -1,11 +1,42 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import LocationInput from "../components/LocationInput";
 
 export default function Home() {
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem("user"));
   const [query, setQuery] = useState("");
   const [location, setLocation] = useState("");
+  const [isLocating, setIsLocating] = useState(false);
+
+  const handleLocateMe = () => {
+    if ("geolocation" in navigator) {
+      setIsLocating(true);
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          try {
+            const { latitude, longitude } = position.coords;
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+            const data = await res.json();
+            const city = data.address.city || data.address.town || data.address.village || data.address.county || data.address.suburb || "Local Area";
+            setLocation(city);
+          } catch (error) {
+            console.error("Error finding location name:", error);
+            setLocation("My Location"); // fallback
+          } finally {
+            setIsLocating(false);
+          }
+        },
+        (error) => {
+          console.error("Geolocation error:", error);
+          setIsLocating(false);
+          alert("Could not access your location. Please check browser permissions.");
+        }
+      );
+    } else {
+      alert("Location features are not supported by your browser.");
+    }
+  };
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -62,13 +93,32 @@ export default function Home() {
             <span className="text-gray-400 mr-3 text-xl">📍</span>
             <div className="flex-1 text-left">
               <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Where</label>
-              <input
-                type="text"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="City, state, or zip code"
-                className="w-full bg-transparent text-white focus:outline-none text-sm md:text-base placeholder-gray-600"
-              />
+              <div className="flex items-center">
+                <LocationInput
+                  value={location}
+                  onChange={setLocation}
+                  placeholder="Your city or neighborhood"
+                  className="w-full bg-transparent text-white focus:outline-none text-sm md:text-base placeholder-gray-600"
+                />
+                <button
+                  type="button"
+                  onClick={handleLocateMe}
+                  disabled={isLocating}
+                  className="ml-2 px-2 py-1 text-[#5CB144] hover:text-white bg-[#5CB144]/10 hover:bg-[#5CB144]/20 rounded-lg transition border border-[#5CB144]/20 flex items-center justify-center cursor-pointer whitespace-nowrap text-xs font-bold"
+                  title="Detect my location"
+                >
+                  {isLocating ? (
+                    <span className="animate-pulse">Locating...</span>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10zm0-7a3 3 0 1 1 0-6 3 3 0 0 1 0 6z" />
+                      </svg>
+                      Locate
+                    </div>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -155,7 +205,7 @@ export default function Home() {
               Find the perfect candidates for your open roles today. Post jobs, browse resumes, and connect directly with ready-to-work professionals.
             </p>
             <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
-              <button onClick={() => navigate("/post-job")} className="bg-transparent border border-[#5CB144] hover:bg-[#5CB144]/10 text-[#5CB144] font-bold py-3 px-8 rounded-2xl transition w-full sm:w-auto">
+              <button onClick={() => navigate("/register?role=employer")} className="bg-transparent border border-[#5CB144] hover:bg-[#5CB144]/10 text-[#5CB144] font-bold py-3 px-8 rounded-2xl transition w-full sm:w-auto">
                 Post a Job - It&apos;s Free
               </button>
               <button onClick={() => navigate("/employer")} className="text-gray-400 hover:text-white font-medium py-3 px-8 rounded-2xl transition w-full sm:w-auto">

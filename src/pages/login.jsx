@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useThemeColor } from "../hooks/useThemeColor";
+import api from "../api";
 
 export default function Login() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -19,19 +20,33 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
 
     if (email && password) {
-      // Temporary mock login
-      localStorage.setItem("user", JSON.stringify({ email, role: role }));
-      navigate("/dashboard");
+      try {
+        const res = await api.post('/auth/login', { email, password });
+
+        // Store the token and user info
+        localStorage.setItem("token", res.data.token);
+        localStorage.setItem("user", JSON.stringify(res.data.user));
+
+        if (res.data.user.role === "employer") {
+          navigate("/employer");
+        } else {
+          navigate("/home");
+        }
+      } catch (err) {
+        const errorMessage = err.response?.data?.message
+          || (err.message === "Network Error" ? "Network error: Is the backend server running?" : "Login failed. Please check credentials.");
+        alert(errorMessage);
+      }
     }
   };
 
   const handleGuestLogin = () => {
     localStorage.setItem("user", JSON.stringify({ email: "Guest User", role: "guest" }));
-    navigate("/dashboard");
+    navigate("/home");
   };
 
   return (

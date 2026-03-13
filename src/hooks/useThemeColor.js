@@ -12,8 +12,7 @@ export function useThemeColor() {
         '/find-cvs',
         '/products',
         '/resources',
-        '/post-job',
-        '/employer-dashboard'
+        '/dashboard'
     ];
 
     let isEmployerContext = employerRoutes.some(route => currentPath.startsWith(route));

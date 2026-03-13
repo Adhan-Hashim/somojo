@@ -1,56 +1,56 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 
-// Premium mock data generator with detailed job descriptions
+import api from '../api';
+
+// For fallback UI if API is empty
 const generateMockJobs = (query, location, category) => {
-    const baseJobs = [
-        { id: 1, title: 'Store Manager', company: 'Volt Retail Inc.', location: 'New York, NY', type: 'Full-time', pay: '$25/hr', urgent: true, new: true, category: 'Retail & Sales', logoSeed: 'Volt', posted: '2 hours ago', applicants: 12 },
-        { id: 2, title: 'Senior Barista', company: 'Neon Coffee', location: 'Brooklyn, NY', type: 'Part-time', pay: '$18/hr', urgent: false, new: true, category: 'Restaurant & Food', logoSeed: 'Neon', posted: '5 hours ago', applicants: 34 },
-        { id: 3, title: 'Warehouse Supervisor', company: 'Prime Logistics', location: 'Newark, NJ', type: 'Full-time', pay: '$22/hr', urgent: true, new: false, category: 'Warehouse', logoSeed: 'Prime', posted: '1 day ago', applicants: 8 },
-        { id: 4, title: 'Delivery Fleet Driver', company: 'QuickShip', location: 'Queens, NY', type: 'Contract', pay: '$20/hr', urgent: false, new: false, category: 'Delivery & Driver', logoSeed: 'Quick', posted: '2 days ago', applicants: 45 },
-        { id: 5, title: 'Customer Success Specialist', company: 'TechFix Solutions', location: 'Remote', type: 'Full-time', pay: '$24/hr', urgent: true, new: true, category: 'Customer Support', logoSeed: 'Tech', posted: '30 mins ago', applicants: 3 },
-        { id: 6, title: 'Event Coordinator', company: 'City Events LLC', location: 'Manhattan, NY', type: 'Temporary', pay: '$30/hr', urgent: false, new: false, category: 'Events', logoSeed: 'City', posted: '3 days ago', applicants: 89 },
-        { id: 7, title: 'Boutique Sales Associate', company: 'Aura Fashion', location: 'SoHo, NY', type: 'Part-time', pay: '$19/hr', urgent: false, new: true, category: 'Retail & Sales', logoSeed: 'Aura', posted: '4 hours ago', applicants: 21 },
-        { id: 8, title: 'Line Cook / Chef', company: 'Midnight Burger', location: 'Bronx, NY', type: 'Full-time', pay: '$21/hr', urgent: true, new: false, category: 'Restaurant & Food', logoSeed: 'Midnight', posted: '12 hours ago', applicants: 5 },
-    ];
-
-    let filtered = baseJobs;
-
-    if (query) {
-        const q = query.toLowerCase();
-        filtered = filtered.filter(j =>
-            j.title.toLowerCase().includes(q) ||
-            j.company.toLowerCase().includes(q)
-        );
-    }
-
-    if (location) {
-        const l = location.toLowerCase();
-        filtered = filtered.filter(j => j.location.toLowerCase().includes(l));
-    }
-
-    if (category) {
-        const c = category.toLowerCase();
-        filtered = filtered.filter(j => j.category.toLowerCase() === c);
-    }
-
-    // Multiply the results if it's too few, just to make the UI look populated and impressive
-    if (filtered.length > 0 && filtered.length < 6) {
-        const clones = filtered.map(j => ({ ...j, id: j.id + 100, urgent: false, new: false, posted: '3 days ago' }));
-        filtered = [...filtered, ...clones];
-    }
-
-    return filtered;
+    // keeping the fallback intact just in case the db is totally empty for presentation
+    return [];
 };
 
 export default function Jobs() {
     const [searchParams, setSearchParams] = useSearchParams();
     const navigate = useNavigate();
 
+    // Check authentication state
+    const userStr = localStorage.getItem("user");
+    const user = userStr && userStr !== "undefined" ? JSON.parse(userStr) : null;
+
     // Controlled inputs for the search bar
     const [queryInput, setQueryInput] = useState(searchParams.get('q') || '');
     const [locationInput, setLocationInput] = useState(searchParams.get('loc') || '');
     const categoryParam = searchParams.get('category');
+    const [isLocating, setIsLocating] = useState(false);
+
+    const handleLocateMe = () => {
+        if ("geolocation" in navigator) {
+            setIsLocating(true);
+            navigator.geolocation.getCurrentPosition(
+                async (position) => {
+                    try {
+                        const { latitude, longitude } = position.coords;
+                        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+                        const data = await res.json();
+                        const city = data.address.city || data.address.town || data.address.village || data.address.county || data.address.suburb || "Local Area";
+                        setLocationInput(city);
+                    } catch (error) {
+                        console.error("Error finding location name:", error);
+                        setLocationInput("My Location");
+                    } finally {
+                        setIsLocating(false);
+                    }
+                },
+                (error) => {
+                    console.error("Geolocation error:", error);
+                    setIsLocating(false);
+                    alert("Could not access your location. Please check browser permissions.");
+                }
+            );
+        } else {
+            alert("Location features are not supported by your browser.");
+        }
+    };
 
     const [jobs, setJobs] = useState([]);
     const [isSearching, setIsSearching] = useState(true);
@@ -62,21 +62,45 @@ export default function Jobs() {
     });
 
     useEffect(() => {
-        setIsSearching(true);
-        // Simulate a sophisticated matching algorithm delay to show loading state
-        const timer = setTimeout(() => {
-            let results = generateMockJobs(searchParams.get('q'), searchParams.get('loc'), categoryParam);
+        const fetchJobs = async () => {
+            setIsSearching(true);
+            try {
+                let res;
+                if (user && user.role === 'job-seeker') {
+                    res = await api.get('/jobs/recommended');
+                } else {
+                    res = await api.get('/jobs');
+                }
 
-            // Apply mock frontend filters
-            if (activeFilters.type.size > 0) {
-                results = results.filter(j => activeFilters.type.has(j.type));
+                let results = res.data;
+
+                // Frontend Filters Text Match
+                if (searchParams.get('q')) {
+                    const q = searchParams.get('q').toLowerCase();
+                    results = results.filter(j => j.title.toLowerCase().includes(q) || j.company.toLowerCase().includes(q));
+                }
+                if (searchParams.get('loc')) {
+                    const l = searchParams.get('loc').toLowerCase();
+                    results = results.filter(j => j.location.toLowerCase().includes(l));
+                }
+                if (categoryParam) {
+                    const c = categoryParam.toLowerCase();
+                    results = results.filter(j => j.type?.toLowerCase() === c || j.category?.toLowerCase() === c);
+                }
+                if (activeFilters.type.size > 0) {
+                    results = results.filter(j => activeFilters.type.has(j.type));
+                }
+
+                setJobs(results);
+            } catch (err) {
+                console.error("Failed to fetch jobs:", err);
+            } finally {
+                setIsSearching(false);
             }
+        };
 
-            setJobs(results);
-            setIsSearching(false);
-        }, 800);
-        return () => clearTimeout(timer);
-    }, [searchParams, categoryParam, activeFilters]);
+        fetchJobs();
+    }, [searchParams, categoryParam, activeFilters, user?.role]);
 
     const handleSearch = (e) => {
         e.preventDefault();
@@ -146,13 +170,33 @@ export default function Jobs() {
                         </span>
                         <div className="flex-1 text-left">
                             <label className="block text-[10px] font-bold text-[#5CB144]/70 uppercase tracking-widest mb-0.5">Where do you want to work?</label>
-                            <input
-                                type="text"
-                                value={locationInput}
-                                onChange={(e) => setLocationInput(e.target.value)}
-                                placeholder="City, neighborhood, or zip..."
-                                className="w-full bg-transparent text-white focus:outline-none text-base md:text-lg placeholder-gray-500 font-medium"
-                            />
+                            <div className="flex items-center">
+                                <input
+                                    type="text"
+                                    value={locationInput}
+                                    onChange={(e) => setLocationInput(e.target.value)}
+                                    placeholder="Your city or neighborhood"
+                                    className="w-full bg-transparent text-white focus:outline-none text-base md:text-lg placeholder-gray-500 font-medium"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={handleLocateMe}
+                                    disabled={isLocating}
+                                    className="ml-2 px-3 py-1.5 text-[#5CB144] hover:text-white bg-[#5CB144]/10 hover:bg-[#5CB144]/20 rounded-xl transition border border-[#5CB144]/20 flex items-center justify-center cursor-pointer whitespace-nowrap text-sm font-bold shadow-md"
+                                    title="Detect my location"
+                                >
+                                    {isLocating ? (
+                                        <span className="animate-pulse">Locating...</span>
+                                    ) : (
+                                        <div className="flex items-center gap-2">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                                <path d="M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10zm0-7a3 3 0 1 1 0-6 3 3 0 0 1 0 6z" />
+                                            </svg>
+                                            Locate
+                                        </div>
+                                    )}
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -255,9 +299,8 @@ export default function Jobs() {
                         ) : jobs.length > 0 ? (
                             jobs.map((job) => (
                                 <div
-                                    key={job.id}
-                                    onClick={() => navigate('/login')}
-                                    className="group relative bg-[#0a0a0a]/90 backdrop-blur-2xl border border-white/10 rounded-[30px] p-6 sm:p-8 cursor-pointer overflow-hidden transition-all duration-500 hover:-translate-y-1 hover:border-[#CF9EFF]/40 hover:shadow-[0_20px_50px_-10px_rgba(207,158,255,0.15)]"
+                                    key={job._id || job.id}
+                                    className="group relative bg-[#0a0a0a]/90 backdrop-blur-2xl border border-white/10 rounded-[30px] p-6 sm:p-8 overflow-hidden transition-all duration-500 hover:-translate-y-1 hover:border-[#CF9EFF]/40 hover:shadow-[0_20px_50px_-10px_rgba(207,158,255,0.15)]"
                                 >
                                     {/* Subtly glowing backplate visible on hover */}
                                     <div className="absolute inset-0 bg-gradient-to-r from-[#CF9EFF]/0 via-[#CF9EFF]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"></div>
@@ -288,6 +331,11 @@ export default function Jobs() {
                                                             <span className="w-1.5 h-1.5 rounded-full bg-[#5CB144] animate-pulse"></span> Urgent
                                                         </span>
                                                     )}
+                                                    {job.aiMatchScore > 0 && (
+                                                        <span className="bg-gradient-to-r from-[#CF9EFF] to-[#A374FF] text-black text-xs font-bold px-3 py-1.5 rounded-full shadow-lg shadow-[#CF9EFF]/30 flex items-center gap-1.5 whitespace-nowrap">
+                                                            ✨ AI Match {job.aiMatchScore}%
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
 
@@ -304,16 +352,21 @@ export default function Jobs() {
                                                 </div>
                                             </div>
 
-                                            {/* Footer Footer */}
+                                            {/* Footer */}
                                             <div className="flex justify-between items-center pt-4 border-t border-white/5">
                                                 <div className="text-sm text-gray-500 font-medium flex gap-4">
                                                     <span>⏱ Posted {job.posted}</span>
                                                     <span className="hidden sm:inline">👥 {job.applicants} applicants</span>
                                                 </div>
 
-                                                {/* Action Button that slides in / becomes vibrant on hover */}
-                                                <div className="flex items-center gap-2 text-[#CF9EFF] font-bold text-sm bg-white/5 px-5 py-2 rounded-xl group-hover:bg-[#CF9EFF] group-hover:text-black transition-all duration-300 transform group-hover:scale-105 shadow-md">
-                                                    Quick Apply <span className="group-hover:translate-x-1 transition-transform">→</span>
+                                                <div className="flex items-center gap-3">
+                                                    {/* View Details / Apply Button */}
+                                                    <button
+                                                        onClick={() => navigate(`/apply/${job._id || job.id}`)}
+                                                        className="text-[#CF9EFF] font-bold text-sm bg-[#CF9EFF]/10 border border-[#CF9EFF]/20 px-5 py-2 rounded-xl hover:bg-[#CF9EFF] hover:text-black transition-all duration-300 shadow-md"
+                                                    >
+                                                        View &amp; Apply →
+                                                    </button>
                                                 </div>
                                             </div>
                                         </div>
