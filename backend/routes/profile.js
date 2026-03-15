@@ -2,44 +2,51 @@ const express = require('express');
 const router = express.Router();
 const Profile = require('../models/Profile');
 const authMiddleware = require('../middleware/authMiddleware');
+const multer = require('multer');
+const path = require('path');
+const profileController = require('../controllers/profileController');
 
-// @route   GET /api/profile/me
-// @desc    Get current user's profile
-// @access  Private
-router.get('/me', authMiddleware, async (req, res) => {
-    try {
-        const profile = await Profile.findOne({ user: req.user.id }).populate('user', ['name', 'email']);
-
-        if (!profile) {
-            return res.status(404).json({ message: 'There is no profile for this user' });
-        }
-
-        res.json(profile);
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server Error');
+// Multer Storage Configuration
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/resumes');
+    },
+    filename: (req, file, cb) => {
+        cb(null, `resume-${req.user.id}-${Date.now()}${path.extname(file.originalname)}`);
     }
 });
 
+const upload = multer({
+    storage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype === 'application/pdf' || file.mimetype === 'application/msword' || file.mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+            cb(null, true);
+        } else {
+            cb(new Error('Invalid file type. Only PDF and DOC are allowed.'));
+        }
+    }
+});
+
+// @route   GET /api/profile/me
+router.get('/me', authMiddleware, profileController.getCurrentProfile);
+
 // @route   POST /api/profile/search
-// @desc    Semantic search across all profiles using AI
-// @access  Private
-const profileController = require('../controllers/profileController');
 router.post('/search', authMiddleware, profileController.searchProfiles);
 
 // @route   POST /api/profile/employer-branding
-// @desc    Generate Employer Branding Profile using AI
-// @access  Private
 router.post('/employer-branding', authMiddleware, profileController.generateEmployerBrand);
 
+// @route   POST /api/profile/upload-resume
+router.post('/upload-resume', authMiddleware, upload.single('resume'), profileController.uploadResume);
+
+// @route   POST /api/profile/autofill
+router.post('/autofill', authMiddleware, profileController.autofillFromResume);
+
 // @route   POST /api/profile
-// @desc    Create or update user profile
-// @access  Private
 router.post('/', authMiddleware, profileController.createOrUpdateProfile);
 
 // @route   PUT /api/profile/save-job/:jobId
-// @desc    Toggle saving a job
-// @access  Private
 router.put('/save-job/:jobId', authMiddleware, profileController.toggleSaveJob);
 
 module.exports = router;

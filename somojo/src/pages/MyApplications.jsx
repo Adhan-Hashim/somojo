@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { MapPinHouse } from "lucide-react";
 import { useThemeColor } from "../hooks/useThemeColor";
 import api from "../api";
 
@@ -18,7 +19,7 @@ export default function MyApplications() {
         const fetchApplications = async () => {
             setLoading(true);
             try {
-                const res = await api.get("/applications/my-applications");
+                const res = await api.get("/api/applications/my-applications");
                 setApplications(res.data);
             } catch (err) {
                 console.error("Failed to fetch applications", err);
@@ -180,8 +181,8 @@ export default function MyApplications() {
                                             <h3 className="text-xl font-bold text-white mb-1 group-hover:text-gray-300 transition">{app.job?.title || "Deleted Job"}</h3>
                                             <p className={`font-semibold ${themeText} mb-2`}>{app.job?.company || "Unknown Company"}</p>
                                             <div className="flex flex-wrap gap-2">
-                                                <span className="bg-white/5 border border-white/10 px-3 py-1 rounded-lg text-xs text-gray-400 font-medium">
-                                                    📍 {app.job?.location}
+                                                <span className="bg-white/5 border border-white/10 px-3 py-1 rounded-lg text-xs text-gray-400 font-medium flex items-center gap-1">
+                                                    <MapPinHouse className="w-3 h-3" /> {app.job?.location}
                                                 </span>
                                                 <span className="bg-white/5 border border-white/10 px-3 py-1 rounded-lg text-xs text-gray-400 font-medium">
                                                     💼 {app.job?.type}
@@ -215,13 +216,12 @@ export default function MyApplications() {
                                                 <div className="flex items-center gap-2">
                                                     <div className="w-32 h-2 bg-white/10 rounded-full overflow-hidden">
                                                         <div
-                                                            className={`h-full ${
-                                                                app.aiMatchScore >= 80
+                                                            className={`h-full ${app.aiMatchScore >= 80
                                                                     ? "bg-[#5CB144]"
                                                                     : app.aiMatchScore >= 60
-                                                                    ? "bg-[#CF9EFF]"
-                                                                    : "bg-yellow-500"
-                                                            }`}
+                                                                        ? "bg-[#CF9EFF]"
+                                                                        : "bg-yellow-500"
+                                                                }`}
                                                             style={{ width: `${app.aiMatchScore}%` }}
                                                         />
                                                     </div>

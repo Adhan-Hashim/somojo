@@ -40,6 +40,7 @@ const STATUS_COLORS = {
     active: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20",
     inactive: "text-amber-400 bg-amber-400/10 border-amber-400/20",
     closed: "text-rose-400 bg-rose-400/10 border-rose-400/20",
+    pending: "text-amber-400 bg-amber-400/10 border-amber-400/20",
 };
 
 const fmt = (n) => n?.toLocaleString() ?? "0";
@@ -139,7 +140,7 @@ export default function AdminPage() {
 
     const fetchStats = useCallback(async () => {
         try {
-            const res = await api.get("/admin/stats");
+            const res = await api.get("/api/admin/stats");
             setStats(res.data);
         } catch { /* ignore */ }
     }, []);
@@ -147,7 +148,7 @@ export default function AdminPage() {
     const fetchUsers = useCallback(async () => {
         setLoading(true);
         try {
-            const res = await api.get("/admin/users", {
+            const res = await api.get("/api/admin/users", {
                 params: { page: userPage, limit: 15, search: userSearch, role: userRole },
             });
             setUsers(res.data.users);
@@ -158,7 +159,7 @@ export default function AdminPage() {
     const fetchJobs = useCallback(async () => {
         setLoading(true);
         try {
-            const res = await api.get("/admin/jobs", {
+            const res = await api.get("/api/admin/jobs", {
                 params: { page: jobPage, limit: 15, search: jobSearch },
             });
             setJobs(res.data.jobs);
@@ -169,7 +170,7 @@ export default function AdminPage() {
     const fetchApps = useCallback(async () => {
         setLoading(true);
         try {
-            const res = await api.get("/admin/applications", {
+            const res = await api.get("/api/admin/applications", {
                 params: { page: appPage, limit: 15, status: appStatus },
             });
             setApps(res.data.applications);
@@ -183,36 +184,36 @@ export default function AdminPage() {
     useEffect(() => { if (activeTab === "Applications") fetchApps(); }, [activeTab, fetchApps]);
 
     const toggleBan = async (userId) => {
-        await api.put(`/admin/users/${userId}/ban`);
+        await api.put(`/api/admin/users/${userId}/ban`);
         fetchUsers();
     };
 
     const changeRole = async (userId, role) => {
-        await api.put(`/admin/users/${userId}/role`, { role });
+        await api.put(`/api/admin/users/${userId}/role`, { role });
         fetchUsers();
     };
 
     const deleteUser = async (userId) => {
         if (!window.confirm("CRITICAL: Delete user data permanently?")) return;
-        await api.delete(`/admin/users/${userId}`);
+        await api.delete(`/api/admin/users/${userId}`);
         fetchUsers();
     };
 
     const deleteJob = async (jobId) => {
         if (!window.confirm("CRITICAL: Delete this job and all its applications?")) return;
-        await api.delete(`/admin/jobs/${jobId}`);
+        await api.delete(`/api/admin/jobs/${jobId}`);
         fetchJobs();
     };
 
     const changeJobStatus = async (jobId, status) => {
-        await api.put(`/admin/jobs/${jobId}/status`, { status });
+        await api.put(`/api/admin/jobs/${jobId}/status`, { status });
         fetchJobs();
     };
 
     const promote = async () => {
         if (!promoteEmail) return;
         try {
-            const res = await api.post("/admin/promote", { email: promoteEmail });
+            const res = await api.post("/api/admin/promote", { email: promoteEmail });
             setPromoteMsg(`✅ ${res.data.message}`);
             setPromoteEmail("");
         } catch (e) {
@@ -479,6 +480,15 @@ export default function AdminPage() {
                                                         <button onClick={() => navigate(`/jobs/${j._id}`)} className="p-2.5 bg-white/5 text-slate-400 rounded-lg hover:bg-white/10 hover:text-white transition-all" title="View Listing">
                                                             <FiEye size={18} />
                                                         </button>
+                                                        {j.status === 'pending' && (
+                                                            <button
+                                                                onClick={() => changeJobStatus(j._id, 'active')}
+                                                                className="p-2.5 bg-emerald-500/10 text-emerald-400 rounded-lg hover:bg-emerald-500 hover:text-white transition-all"
+                                                                title="Approve Job"
+                                                            >
+                                                                <FiCheckCircle size={18} />
+                                                            </button>
+                                                        )}
                                                         <button onClick={() => deleteJob(j._id)} className="p-2.5 bg-rose-500/10 text-rose-400 rounded-lg hover:bg-rose-500 hover:text-white transition-all" title="Delete Listing">
                                                             <FiTrash2 size={18} />
                                                         </button>

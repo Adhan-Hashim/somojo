@@ -1,3 +1,5 @@
+import { FileUser } from "lucide-react";
+
 export default function SearchingAnimation() {
     return (
         <div className="w-full h-full bg-black/40 border border-gray-700 rounded-xl overflow-hidden relative flex items-center shadow-inner">
@@ -33,7 +35,7 @@ export default function SearchingAnimation() {
                     <div className="flex-1 flex justify-around items-end w-full">
                         <div className="text-lg mb-1 opacity-70">🏢</div>
                         <div className="text-base mb-1 opacity-50">💼</div>
-                        <div className="text-lg mb-1 opacity-80">📄</div>
+                        <div className="text-lg mb-1 opacity-80"><FileUser className="w-4 h-4" /></div>
                         <div className="text-xl mb-1 opacity-60">🏭</div>
                     </div>
 
@@ -41,7 +43,7 @@ export default function SearchingAnimation() {
                     <div className="flex-1 flex justify-around items-end w-full">
                         <div className="text-lg mb-1 opacity-70">🏢</div>
                         <div className="text-base mb-1 opacity-50">💼</div>
-                        <div className="text-lg mb-1 opacity-80">📄</div>
+                        <div className="text-lg mb-1 opacity-80"><FileUser className="w-4 h-4" /></div>
                         <div className="text-xl mb-1 opacity-60">🏭</div>
                     </div>
 

@@ -7,7 +7,7 @@ import LocationInput from "../components/LocationInput";
 
 export default function Register() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialRole = searchParams.get("role") === "employer" ? "employer" : "student";
+  const initialRole = searchParams.get("role") === "employer" ? "employer" : "job-seeker";
   const [role, setRole] = useState(initialRole);
 
   // Update the URL search param when switching roles to trigger global theme changes
@@ -81,7 +81,7 @@ export default function Register() {
   const handleResendOTP = async () => {
     if (resendCooldown > 0) return;
     try {
-      await api.post('/auth/resend-otp', { name: email.split('@')[0], email });
+      await api.post('/api/auth/resend-otp', { name: email.split('@')[0], email });
       setResendCooldown(30);
       alert("A new 6-digit code has been sent to your email. If you don't receive it, check the server console/logs for the OTP code.");
     } catch (err) {
@@ -103,12 +103,12 @@ export default function Register() {
           name: email.split('@')[0], // Generate a placeholder name from email
           email,
           password,
-          role: role === "student" ? "job-seeker" : "employer",
+          role: role === "job-seeker" ? "job-seeker" : "employer",
           contact,
           location
         };
 
-        const res = await api.post('/auth/register', payload);
+        const res = await api.post('/api/auth/register', payload);
 
         if (res.data.requiresOTP) {
           // Show the OTP verification screen
@@ -135,13 +135,13 @@ export default function Register() {
         name: email.split('@')[0], // Generate a placeholder name from email
         email,
         password,
-        role: role === "student" ? "job-seeker" : "employer",
+        role: role === "job-seeker" ? "job-seeker" : "employer",
         contact,
         location,
         otp: otpArray.join('')
       };
 
-      const res = await api.post('/auth/verify-otp', payload);
+      const res = await api.post('/api/auth/verify-otp', payload);
 
       // Verification successful, login the user
       localStorage.setItem("token", res.data.token);
@@ -274,8 +274,8 @@ export default function Register() {
                   <div className="flex bg-black/50 p-1.5 rounded-2xl mb-8 relative border border-white/5">
                     <button
                       type="button"
-                      onClick={() => handleRoleChange("student")}
-                      className={`flex-1 py-3 px-6 text-center rounded-xl font-bold transition-all z-10 ${role === "student" ? "text-black shadow-lg" : "text-gray-400 hover:text-white"
+                      onClick={() => handleRoleChange("job-seeker")}
+                      className={`flex-1 py-3 px-6 text-center rounded-xl font-bold transition-all z-10 ${role === "job-seeker" ? "text-black shadow-lg" : "text-gray-400 hover:text-white"
                         }`}
                     >
                       Job Seeker
@@ -291,7 +291,7 @@ export default function Register() {
                     {/* Sliding Highlight Background */}
                     <div
                       className={`absolute top-1.5 bottom-1.5 w-[calc(50%-6px)] ${themeBg} rounded-xl transition-all duration-300 ease-out`}
-                      style={{ left: role === "student" ? "6px" : "calc(50% + 0px)" }}
+                      style={{ left: role === "job-seeker" ? "6px" : "calc(50% + 0px)" }}
                     />
                   </div>
                 </div>

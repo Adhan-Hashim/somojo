@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { registerUser, loginUser, getUser, verifyOTP, resendOTP } = require('../controllers/authController');
+const { registerUser, loginUser, getUser, verifyOTP, resendOTP, verifyAdminLoginOTP } = require('../controllers/authController');
 const auth = require('../middleware/authMiddleware');
 const OTP = require('../models/OTP');
 
@@ -14,6 +14,11 @@ router.post('/verify-otp', verifyOTP);
 // @desc    Resend Email OTP
 // @access  Public
 router.post('/resend-otp', resendOTP);
+
+// @route   POST /api/auth/verify-admin-otp
+// @desc    Verify OTP for admin login
+// @access  Public
+router.post('/verify-admin-otp', verifyAdminLoginOTP);
 router.post('/login', loginUser);
 router.get('/me', auth, getUser);
 

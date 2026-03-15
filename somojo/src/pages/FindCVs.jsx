@@ -13,7 +13,7 @@ export default function FindCVs() {
         setIsSearching(true);
         setHasSearched(true);
         try {
-            const res = await api.post('/profile/search', { query });
+            const res = await api.post('/api/profile/search', { query });
             setResults(res.data);
         } catch (error) {
             console.error("AI Search Failed:", error);

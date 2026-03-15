@@ -37,7 +37,7 @@ export default function SmartInterview() {
         setIsLoading(true);
 
         try {
-            const res = await api.post('/interview/chat', {
+            const res = await api.post('/api/interview/chat', {
                 messages: newMessages,
                 company,
                 jobRole
@@ -76,8 +76,8 @@ export default function SmartInterview() {
                         <div key={index} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                             <div
                                 className={`max-w-[80%] rounded-2xl p-4 ${msg.role === 'user'
-                                        ? 'bg-[#CF9EFF] text-black rounded-tr-sm shadow-lg shadow-[#CF9EFF]/20'
-                                        : 'bg-white/10 text-gray-200 border border-white/5 rounded-tl-sm'
+                                    ? 'bg-[#CF9EFF] text-black rounded-tr-sm shadow-lg shadow-[#CF9EFF]/20'
+                                    : 'bg-white/10 text-gray-200 border border-white/5 rounded-tl-sm'
                                     }`}
                             >
                                 <p className="leading-relaxed whitespace-pre-wrap">{msg.parts[0].text}</p>

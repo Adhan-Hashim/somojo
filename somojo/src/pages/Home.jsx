@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { MapPinHouse } from "lucide-react";
 import LocationInput from "../components/LocationInput";
 
 export default function Home() {
@@ -90,7 +91,7 @@ export default function Home() {
           <div className="hidden md:block w-[1px] bg-white/10 my-2"></div>
 
           <div className="flex-1 flex items-center bg-black/40 rounded-2xl px-4 py-3 md:py-0 border border-transparent focus-within:border-gray-600 transition">
-            <span className="text-gray-400 mr-3 text-xl">📍</span>
+            <MapPinHouse className="text-gray-400 mr-3 w-5 h-5" />
             <div className="flex-1 text-left">
               <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Where</label>
               <div className="flex items-center">

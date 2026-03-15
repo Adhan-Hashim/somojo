@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { MapPinHouse } from "lucide-react";
 import { useThemeColor } from "../hooks/useThemeColor";
 import api from "../api";
 
@@ -28,7 +29,7 @@ export default function MyJobs() {
 
     const fetchApplied = useCallback(async (silent = false) => {
         try {
-            const res = await api.get("/applications/my-applications");
+            const res = await api.get("/api/applications/my-applications");
             const data = Array.isArray(res.data) ? res.data : [];
 
             // Detect status changes for animation
@@ -51,7 +52,7 @@ export default function MyJobs() {
     }, []);
 
     const fetchSaved = useCallback(async () => {
-        const res = await api.get("/saved-jobs");
+        const res = await api.get("/api/saved-jobs");
         setSaved(Array.isArray(res.data) ? res.data : []);
     }, []);
 
@@ -81,7 +82,7 @@ export default function MyJobs() {
 
     const handleUnsave = async (jobId) => {
         try {
-            await api.delete(`/saved-jobs/${jobId}`);
+            await api.delete(`/api/saved-jobs/${jobId}`);
             setSaved(prev => prev.filter(j => j._id !== jobId));
         } catch (err) {
             alert(err.response?.data?.message || "Failed to remove saved job.");
@@ -253,7 +254,7 @@ export default function MyJobs() {
 
                                                 {/* Chips */}
                                                 <div className="flex flex-wrap gap-2 text-xs text-gray-400 my-3">
-                                                    {job.location && <span className="bg-white/5 border border-white/5 px-2.5 py-1 rounded-lg">📍 {job.location}</span>}
+                                                    {job.location && <span className="bg-white/5 border border-white/5 px-2.5 py-1 rounded-lg flex items-center gap-1"><MapPinHouse className="w-3 h-3" /> {job.location}</span>}
                                                     {job.type && <span className="bg-white/5 border border-white/5 px-2.5 py-1 rounded-lg">💼 {job.type}</span>}
                                                     {job.pay && <span className="bg-[#5CB144]/10 border border-[#5CB144]/10 px-2.5 py-1 rounded-lg text-[#5CB144] font-bold">💸 {job.pay}</span>}
                                                 </div>
@@ -324,7 +325,7 @@ export default function MyJobs() {
                                                 </span>
                                             </div>
                                             <div className="flex flex-wrap gap-2 text-xs text-gray-400 mb-3">
-                                                {job.location && <span className="bg-white/5 border border-white/5 px-2.5 py-1 rounded-lg">📍 {job.location}</span>}
+                                                {job.location && <span className="bg-white/5 border border-white/5 px-2.5 py-1 rounded-lg flex items-center gap-1"><MapPinHouse className="w-3 h-3" /> {job.location}</span>}
                                                 {job.type && <span className="bg-white/5 border border-white/5 px-2.5 py-1 rounded-lg">💼 {job.type}</span>}
                                                 {job.pay && <span className="bg-[#5CB144]/10 border border-[#5CB144]/10 px-2.5 py-1 rounded-lg text-[#5CB144] font-bold">💸 {job.pay}</span>}
                                             </div>

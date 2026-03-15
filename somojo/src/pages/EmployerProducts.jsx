@@ -1,3 +1,5 @@
+import { FileUser } from "lucide-react";
+
 export default function EmployerProducts() {
     return (
         <div className="min-h-screen text-white pb-20">
@@ -24,7 +26,7 @@ export default function EmployerProducts() {
                     {
                         title: "Resume Subscriptions",
                         desc: "Gain unlimited access to our database of thousands of local resumes. Proactively reach out to the perfect fit.",
-                        icon: "📄",
+                        icon: <FileUser size={48} />,
                         color: "from-[#5CB144]"
                     },
                     {

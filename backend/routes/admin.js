@@ -146,7 +146,7 @@ router.get('/jobs', async (req, res) => {
 router.put('/jobs/:id/status', async (req, res) => {
     try {
         const { status } = req.body;
-        if (!['active', 'inactive', 'closed'].includes(status))
+        if (!['active', 'inactive', 'closed', 'pending'].includes(status))
             return res.status(400).json({ message: 'Invalid status' });
         const job = await Job.findByIdAndUpdate(req.params.id, { status }, { new: true });
         if (!job) return res.status(404).json({ message: 'Job not found' });

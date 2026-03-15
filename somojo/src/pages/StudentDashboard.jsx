@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { MapPinHouse } from "lucide-react";
 import JobCard from "../components/JobCard";
 import api from "../api";
 
@@ -27,7 +28,7 @@ export default function StudentDashboard() {
             setLoading(true);
 
             // 1. Fetch Profile for savedJobs and location
-            const profileRes = await api.get('/profile/me');
+            const profileRes = await api.get('/api/profile/me');
             const profile = profileRes.data;
             if (profile.location) setUserLocation(profile.location);
             if (profile.locationPoint?.coordinates) {
@@ -35,14 +36,14 @@ export default function StudentDashboard() {
             }
 
             // 2. Fetch All active jobs (baseline for saved/applied filtering)
-            const jobsRes = await api.get('/jobs');
+            const jobsRes = await api.get('/api/jobs');
             setAllJobs(jobsRes.data);
 
             // 3. Conditionally Fetch Nearby Jobs if coordinates exist
             if (profile.locationPoint?.coordinates) {
                 const [lng, lat] = profile.locationPoint.coordinates;
                 // Default maxDistance is 50km in backend. We can adjust or let backend decide.
-                const nearbyRes = await api.get(`/jobs/nearby?lng=${lng}&lat=${lat}`);
+                const nearbyRes = await api.get(`/api/jobs/nearby?lng=${lng}&lat=${lat}`);
                 setNearbyJobs(nearbyRes.data);
             } else {
                 // Fallback to substring matching if no exact geometry
@@ -53,7 +54,7 @@ export default function StudentDashboard() {
             }
 
             // 4. Fetch Applied jobs
-            const appliedRes = await api.get('/applications/my-applications');
+            const appliedRes = await api.get('/api/applications/my-applications');
             setAppliedJobs(appliedRes.data);
 
             // 4. Map saved job IDs to actual job objects
@@ -82,7 +83,7 @@ export default function StudentDashboard() {
     const handleSaveJob = async (jobId) => {
         if (isGuest) return;
         try {
-            const res = await api.put(`/profile/save-job/${jobId}`);
+            const res = await api.put(`/api/profile/save-job/${jobId}`);
             const updatedSavedIds = res.data.savedJobs;
             // Re-calculate saved jobs based on the new array of IDs
             setSavedJobs(allJobs.filter(j => updatedSavedIds.includes(j._id)));
@@ -145,7 +146,7 @@ export default function StudentDashboard() {
             {/* Top Navbar */}
             <div className="bg-white shadow-sm border-b border-gray-200 px-6 py-4 flex justify-between items-center text-black">
                 <h1 className="text-2xl font-bold text-[#5CB144]">
-                    {isGuest ? "Guest Portal" : "Student Portal"}
+                    {isGuest ? "Guest Portal" : "Job Seeker Portal"}
                 </h1>
 
                 <div className="flex items-center gap-4">
@@ -200,8 +201,8 @@ export default function StudentDashboard() {
                             {activeTab === 'nearby' ? "Available Part-Time Jobs" : activeTab === 'saved' ? "Your Saved Jobs" : "Your Applications"}
                         </h2>
                         {activeTab === 'nearby' && userLocation && !isGuest && (
-                            <span className="bg-white/10 text-gray-300 px-4 py-1.5 rounded-full text-sm font-semibold border border-white/10">
-                                📍 Near {userLocation}
+                            <span className="bg-white/10 text-gray-300 px-4 py-1.5 rounded-full text-sm font-semibold border border-white/10 flex items-center gap-2">
+                                <MapPinHouse className="w-4 h-4 text-[#5CB144]" /> Near {userLocation}
                             </span>
                         )}
                     </div>

@@ -1,5 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
+import { MapPinHouse } from "lucide-react";
 import { useThemeColor } from "../hooks/useThemeColor";
 import api from "../api";
 
@@ -21,16 +22,16 @@ export default function JobApplication() {
         const fetchJob = async () => {
             setLoading(true);
             try {
-                const res = await api.get(`/jobs/${id}`);
+                const res = await api.get(`/api/jobs/${id}`);
                 setJob(res.data);
                 // Check if already applied
-                const appRes = await api.get(`/applications/status/${id}`);
+                const appRes = await api.get(`/api/applications/status/${id}`);
                 if (appRes.data) {
                     setApplicationStatus(appRes.data);
                     setSubmitted(appRes.data.status !== 'none');
                 }
                 // Check if job is saved
-                const saveRes = await api.get(`/saved-jobs/check/${id}`);
+                const saveRes = await api.get(`/api/saved-jobs/check/${id}`);
                 setIsSaved(saveRes.data.isSaved);
             } catch (err) {
                 console.error("Error fetching job details", err);
@@ -50,7 +51,7 @@ export default function JobApplication() {
 
         setSubmitting(true);
         try {
-            const res = await api.post(`/applications/${id}`);
+            const res = await api.post(`/api/applications/${id}`);
             // Server returns { message, application } — extract the application object
             const savedApp = res.data.application || res.data;
             setSubmitted(true);
@@ -59,8 +60,9 @@ export default function JobApplication() {
                 appliedAt: savedApp.createdAt || new Date()
             });
         } catch (err) {
-            console.error(err);
-            alert(err.response?.data?.message || 'Failed to apply. Please try again.');
+            console.error("Apply Error:", err);
+            const errorMsg = err.response?.data?.message || err.message || 'Failed to apply. Please try again.';
+            alert(errorMsg);
         } finally {
             setSubmitting(false);
         }
@@ -74,9 +76,9 @@ export default function JobApplication() {
 
         try {
             if (isSaved) {
-                await api.delete(`/saved-jobs/${id}`);
+                await api.delete(`/api/saved-jobs/${id}`);
             } else {
-                await api.post(`/saved-jobs/${id}`);
+                await api.post(`/api/saved-jobs/${id}`);
             }
             setIsSaved(!isSaved);
         } catch (err) {
@@ -140,7 +142,7 @@ export default function JobApplication() {
 
                                     <div className="flex flex-wrap gap-3">
                                         <span className="bg-white/5 border border-white/10 px-4 py-2 rounded-xl text-gray-300 flex items-center gap-2">
-                                            <span className="text-gray-500">📍</span> {job.location}
+                                            <MapPinHouse className="w-5 h-5 text-gray-500" /> {job.location}
                                         </span>
                                         <span className="bg-white/5 border border-white/10 px-4 py-2 rounded-xl text-gray-300 flex items-center gap-2">
                                             <span className="text-gray-500">💼</span> {job.type}

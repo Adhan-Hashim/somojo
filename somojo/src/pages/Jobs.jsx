@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { MapPinHouse } from 'lucide-react';
 
 import api from '../api';
 
@@ -67,9 +68,9 @@ export default function Jobs() {
             try {
                 let res;
                 if (user && user.role === 'job-seeker') {
-                    res = await api.get('/jobs/recommended');
+                    res = await api.get('/api/jobs/recommended');
                 } else {
-                    res = await api.get('/jobs');
+                    res = await api.get('/api/jobs');
                 }
 
                 let results = res.data;
@@ -342,7 +343,7 @@ export default function Jobs() {
                                             {/* Attributes list */}
                                             <div className="flex flex-wrap gap-2 mt-5 mb-6">
                                                 <div className="bg-white/5 border border-white/5 px-3 py-1.5 rounded-xl text-sm text-gray-300 flex items-center gap-2 group-hover:bg-white/10 transition-colors">
-                                                    <span className="text-gray-500">📍</span> {job.location}
+                                                    <MapPinHouse className="w-4 h-4 text-gray-500" /> {job.location}
                                                 </div>
                                                 <div className="bg-white/5 border border-white/5 px-3 py-1.5 rounded-xl text-sm text-gray-300 flex items-center gap-2 group-hover:bg-white/10 transition-colors">
                                                     <span className="text-gray-500">💼</span> {job.type}

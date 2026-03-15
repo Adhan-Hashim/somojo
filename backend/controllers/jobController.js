@@ -1,10 +1,12 @@
 const Job = require('../models/Job');
+const User = require('../models/User');
 const aiService = require('../services/aiService');
+const emailService = require('../services/emailService');
 const locationService = require('../services/locationService');
 
 // @desc    Get all active jobs
 // @route   GET /api/jobs
-// @access  Public or Private (depends on your needs, making it Public for now)
+// @access  Public or Private
 exports.getJobs = async (req, res) => {
     try {
         const jobs = await Job.find({ status: 'active' })
@@ -12,8 +14,22 @@ exports.getJobs = async (req, res) => {
             .sort({ createdAt: -1 });
         res.json(jobs);
     } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server Error');
+        console.error("[getJobs] ERROR:", err.message);
+        res.status(500).json({ message: 'Server Error fetching active jobs', error: err.message });
+    }
+};
+
+// @desc    Get jobs posted by the logged-in user
+// @route   GET /api/jobs/my-jobs
+// @access  Private (Employer)
+exports.getMyJobs = async (req, res) => {
+    try {
+        const jobs = await Job.find({ postedBy: req.user.id })
+            .sort({ createdAt: -1 });
+        res.json(jobs);
+    } catch (err) {
+        console.error("[getMyJobs] ERROR:", err.message);
+        res.status(500).json({ message: 'Server Error fetching employer jobs', error: err.message });
     }
 };
 
@@ -22,7 +38,7 @@ exports.getJobs = async (req, res) => {
 // @access  Public
 exports.getNearbyJobs = async (req, res) => {
     try {
-        const { lng, lat, maxDistance = 50000 } = req.query; // maxDistance default 50km
+        const { lng, lat, maxDistance = 50000 } = req.query;
 
         if (!lng || !lat) {
             return res.status(400).json({ message: "Longitude and Latitude are required" });
@@ -42,7 +58,6 @@ exports.getNearbyJobs = async (req, res) => {
                 }
             },
             {
-                // Optional: Lookup to mimic .populate('postedBy')
                 $lookup: {
                     from: "users",
                     localField: "postedBy",
@@ -51,15 +66,14 @@ exports.getNearbyJobs = async (req, res) => {
                 }
             },
             {
-                // Convert array to single object
                 $unwind: "$postedBy"
             }
         ]);
 
         res.json(jobs);
     } catch (err) {
-        console.error("Error fetching nearby jobs:", err.message);
-        res.status(500).send('Server Error');
+        console.error("[getNearbyJobs] ERROR:", err.message);
+        res.status(500).json({ message: 'Server Error fetching nearby jobs', error: err.message });
     }
 };
 
@@ -76,11 +90,11 @@ exports.getJobById = async (req, res) => {
 
         res.json(job);
     } catch (err) {
-        console.error(err.message);
+        console.error("[getJobById] ERROR:", err.message);
         if (err.kind === 'ObjectId') {
             return res.status(404).json({ message: 'Job not found' });
         }
-        res.status(500).send('Server Error');
+        res.status(500).json({ message: 'Server Error fetching job details', error: err.message });
     }
 };
 
@@ -97,28 +111,26 @@ exports.createJob = async (req, res) => {
         title,
         company,
         location,
-        locationPoint, // <--- Frontend explicit coordinate [lng, lat] passing
+        locationPoint,
         type,
         workplaceType,
-        pay, // Frontend sends "pay"
+        pay,
         salary,
         description,
         requirements,
         benefits,
         responsibilities,
-        category
     } = req.body;
 
     try {
         let finalLocationPoint = locationPoint;
 
-        // Attempt to convert the location string to a GeoJSON point ONLY IF explicit coords were not provided
         if (!finalLocationPoint && location) {
             const coords = await locationService.geocodeLocationWithAI(location);
             if (coords) {
                 finalLocationPoint = {
                     type: "Point",
-                    coordinates: coords // [lng, lat]
+                    coordinates: coords
                 };
             }
         }
@@ -135,14 +147,30 @@ exports.createJob = async (req, res) => {
             requirements: requirements || [],
             benefits: benefits || [],
             responsibilities,
-            postedBy: req.user.id
+            postedBy: req.user.id,
+            status: 'pending'
         });
 
         const job = await newJob.save();
+
+        // Notify Admins
+        try {
+            const admins = await User.find({ role: 'admin' });
+            if (admins.length > 0) {
+                for (const admin of admins) {
+                    await emailService.sendAdminJobNotification(admin.email, job, req.user);
+                }
+            } else {
+                console.log("No admins found to notify about new job posting.");
+            }
+        } catch (emailErr) {
+            console.error("Error notifying admins about new job:", emailErr);
+        }
+
         res.json(job);
     } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server Error');
+        console.error("[createJob] ERROR:", err.message);
+        res.status(500).json({ message: 'Server Error creating job posting', error: err.message });
     }
 };
 
@@ -168,8 +196,8 @@ exports.updateJob = async (req, res) => {
 
         res.json(job);
     } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server Error');
+        console.error("[updateJob] ERROR:", err.message);
+        res.status(500).json({ message: 'Server Error updating job', error: err.message });
     }
 };
 
@@ -191,8 +219,8 @@ exports.deleteJob = async (req, res) => {
 
         res.json({ message: 'Job removed' });
     } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server Error');
+        console.error("[deleteJob] ERROR:", err.message);
+        res.status(500).json({ message: 'Server Error removing job', error: err.message });
     }
 };
 
@@ -215,7 +243,7 @@ exports.enhanceJob = async (req, res) => {
         const enhancedDescription = await aiService.enhanceJobDescription({ title, company, description });
         res.json({ enhancedDescription });
     } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server Error generating AI Job Description');
+        console.error("[enhanceJob] ERROR:", err.message);
+        res.status(500).json({ message: 'Server Error generating AI Job Description', error: err.message });
     }
 };

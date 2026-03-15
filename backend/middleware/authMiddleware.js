@@ -21,6 +21,9 @@ module.exports = async function (req, res, next) {
         req.user = user;
         next();
     } catch (err) {
+        if (err.name === 'TokenExpiredError') {
+            return res.status(401).json({ message: 'Session expired, please login again' });
+        }
         res.status(401).json({ message: 'Token is not valid' });
     }
 };

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { MapPinHouse, FileUser } from "lucide-react";
 import api from "../api";
 import LocationInput from "../components/LocationInput";
 
@@ -59,13 +60,8 @@ export default function EmployerDashboard() {
 
     const fetchJobs = async () => {
         try {
-            const res = await api.get('/jobs');
-            // Check both _id and id because the token payload might map it to 'id', while raw mongo is '_id'
-            const myJobs = res.data.filter(j => {
-                const posterId = j.postedBy?._id || j.postedBy;
-                return posterId === user._id || posterId === user.id || j.employerEmail === user.email;
-            });
-            setJobs(myJobs);
+            const res = await api.get('/api/jobs/my-jobs');
+            setJobs(res.data);
         } catch (err) {
             console.error("Failed to fetch jobs", err);
         }
@@ -73,7 +69,7 @@ export default function EmployerDashboard() {
 
     const fetchProfile = async () => {
         try {
-            const res = await api.get('/profile/me');
+            const res = await api.get('/api/profile/me');
             if (res.data && res.data.employerBranding && res.data.employerBranding.manifesto) {
                 setBrandProfile(res.data.employerBranding);
             }
@@ -120,7 +116,7 @@ export default function EmployerDashboard() {
         };
 
         try {
-            await api.post('/jobs', newJob);
+            await api.post('/api/jobs', newJob);
             await fetchJobs(); // Refresh 
 
             // Reset and close form
@@ -148,7 +144,7 @@ export default function EmployerDashboard() {
 
         setIsEnhancing(true);
         try {
-            const res = await api.post('/jobs/enhance', {
+            const res = await api.post('/api/jobs/enhance', {
                 title: jobTitle,
                 company: jobCompany,
                 description: jobDescription
@@ -166,7 +162,7 @@ export default function EmployerDashboard() {
         e.preventDefault();
         setIsGeneratingBrand(true);
         try {
-            const res = await api.post('/profile/employer-branding', {
+            const res = await api.post('/api/profile/employer-branding', {
                 companyName: brandCompanyName,
                 companyDescription: brandDescription
             });
@@ -342,7 +338,7 @@ export default function EmployerDashboard() {
                             <h2 className="text-2xl font-bold mb-4">Your Active Job Postings</h2>
                             {jobs.length === 0 ? (
                                 <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-2xl p-8 text-center text-gray-400">
-                                    <div className="text-5xl mb-4">📄</div>
+                                    <div className="text-5xl mb-4 text-gray-500"><FileUser className="w-12 h-12 mx-auto" /></div>
                                     <h3 className="text-xl text-white font-semibold mb-2">No active jobs</h3>
                                     <p>You haven't posted any jobs yet. Create a new listing to start receiving applications.</p>
                                 </div>
@@ -353,13 +349,17 @@ export default function EmployerDashboard() {
                                             <div>
                                                 <h3 className="text-xl font-bold text-[#CF9EFF] mb-1">{job.title}</h3>
                                                 <p className="text-gray-300 font-medium">{job.company}</p>
-                                                <p className="text-sm text-gray-400 mt-2">📍 {job.location}</p>
+                                                <p className="text-sm text-gray-400 mt-2 flex items-center gap-1"><MapPinHouse className="w-3 h-3" /> {job.location}</p>
                                                 <p className="text-sm text-gray-400 mt-1">💰 {job.pay}</p>
                                             </div>
                                             <div className="mt-4 pt-4 border-t border-white/10 flex justify-between items-center text-xs text-gray-500">
                                                 <span>Posted: {new Date(job.createdAt || job.postedAt || Date.now()).toLocaleDateString()}</span>
                                                 <div className="flex gap-2">
-                                                    <span className="bg-[#5CB144]/20 text-[#5CB144] px-2 py-1 rounded">Active</span>
+                                                    {job.status === 'pending' ? (
+                                                        <span className="bg-[#f59e0b]/20 text-[#f59e0b] px-2 py-1 rounded">Pending Approval</span>
+                                                    ) : (
+                                                        <span className="bg-[#5CB144]/20 text-[#5CB144] px-2 py-1 rounded">Active</span>
+                                                    )}
                                                     <button
                                                         onClick={() => navigate(`/dashboard/applications/${job._id || job.id}`)}
                                                         className="bg-white/10 hover:bg-white/20 px-3 py-1 rounded text-white transition font-semibold"

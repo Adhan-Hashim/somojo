@@ -32,8 +32,8 @@ export default function EmployerApplications() {
     const fetchData = useCallback(async () => {
         try {
             const [appsRes, jobRes] = await Promise.all([
-                api.get(`/applications/job/${jobId}`),
-                api.get(`/jobs/${jobId}`),
+                api.get(`/api/applications/job/${jobId}`),
+                api.get(`/api/jobs/${jobId}`),
             ]);
             setApplications(appsRes.data);
             setJob(jobRes.data);
@@ -49,13 +49,28 @@ export default function EmployerApplications() {
     const updateStatus = async (appId, status) => {
         setUpdatingId(appId);
         try {
-            await api.put(`/applications/${appId}/status`, { status });
+            await api.put(`/api/applications/${appId}/status`, { status });
             setApplications(prev =>
                 prev.map(a => a._id === appId ? { ...a, status } : a)
             );
         } catch (err) {
             console.error("Status update failed", err);
             alert(err.response?.data?.message || "Failed to update status.");
+        } finally {
+            setUpdatingId(null);
+        }
+    };
+
+    const reEvaluate = async (appId) => {
+        setUpdatingId(appId);
+        try {
+            const res = await api.post(`/api/applications/${appId}/re-evaluate`);
+            setApplications(prev =>
+                prev.map(a => a._id === appId ? { ...a, aiMatchScore: res.data.score, aiAnalysis: res.data.analysis } : a)
+            );
+        } catch (err) {
+            console.error(err);
+            alert("Evaluation failed.");
         } finally {
             setUpdatingId(null);
         }
@@ -229,9 +244,20 @@ export default function EmployerApplications() {
                                                     </div>
 
                                                     {/* AI Score Badge */}
-                                                    <div className={`shrink-0 px-4 py-2 rounded-2xl border font-black text-lg ${SCORE_COLOR(app.aiMatchScore)}`}>
-                                                        {app.aiMatchScore ? `${app.aiMatchScore}%` : "—"}
+                                                    <div className={`shrink-0 px-4 py-2 rounded-2xl border font-black text-lg flex flex-col items-center justify-center relative group`}>
+                                                        <div className={SCORE_COLOR(app.aiMatchScore)}>
+                                                            {app.aiMatchScore && app.aiMatchScore > 0 ? `${app.aiMatchScore}%` : "—"}
+                                                        </div>
                                                         <p className="text-xs font-normal opacity-60">AI Match</p>
+                                                        {(!app.aiMatchScore || app.aiMatchScore === 0) && (
+                                                            <button
+                                                                onClick={() => reEvaluate(app._id)}
+                                                                className="absolute -top-2 -right-2 bg-[#CF9EFF] text-black w-6 h-6 rounded-full flex items-center justify-center text-[10px] shadow-lg hover:scale-110 transition active:scale-95"
+                                                                title="Retry AI Evaluation"
+                                                            >
+                                                                ✨
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </div>
 
@@ -262,32 +288,41 @@ export default function EmployerApplications() {
 
                                             {/* Right: Action Buttons */}
                                             <div className="flex flex-row lg:flex-col gap-2 flex-wrap lg:shrink-0 lg:w-44">
+                                                {app.status !== "accepted" && app.status !== "rejected" && (
+                                                    <>
+                                                        <ActionBtn
+                                                            label="✓ Accept"
+                                                            active={app.status === "accepted"}
+                                                            loading={isUpdating}
+                                                            activeClass="bg-[#5CB144] text-black"
+                                                            inactiveClass="bg-[#5CB144]/10 border border-[#5CB144]/20 text-[#5CB144] hover:bg-[#5CB144] hover:text-black"
+                                                            onClick={() => updateStatus(app._id, "accepted")}
+                                                        />
+                                                        <ActionBtn
+                                                            label="★ Shortlist"
+                                                            active={app.status === "saved"}
+                                                            loading={isUpdating}
+                                                            activeClass="bg-yellow-400 text-black"
+                                                            inactiveClass="bg-yellow-400/10 border border-yellow-400/20 text-yellow-400 hover:bg-yellow-400 hover:text-black"
+                                                            onClick={() => updateStatus(app._id, "saved")}
+                                                        />
+                                                        <ActionBtn
+                                                            label="✕ Reject"
+                                                            active={app.status === "rejected"}
+                                                            loading={isUpdating}
+                                                            activeClass="bg-red-500 text-white"
+                                                            inactiveClass="bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500 hover:text-white"
+                                                            onClick={() => updateStatus(app._id, "rejected")}
+                                                        />
+                                                    </>
+                                                )}
+                                                {app.status === "accepted" && (
+                                                    <div className="w-full py-2.5 px-4 rounded-xl font-bold text-sm bg-[#5CB144]/10 border border-[#5CB144]/30 text-[#5CB144] text-center">
+                                                        Approved ✅
+                                                    </div>
+                                                )}
                                                 <ActionBtn
-                                                    label="✓ Accept"
-                                                    active={app.status === "accepted"}
-                                                    loading={isUpdating}
-                                                    activeClass="bg-[#5CB144] text-black"
-                                                    inactiveClass="bg-[#5CB144]/10 border border-[#5CB144]/20 text-[#5CB144] hover:bg-[#5CB144] hover:text-black"
-                                                    onClick={() => updateStatus(app._id, "accepted")}
-                                                />
-                                                <ActionBtn
-                                                    label="★ Shortlist"
-                                                    active={app.status === "saved"}
-                                                    loading={isUpdating}
-                                                    activeClass="bg-yellow-400 text-black"
-                                                    inactiveClass="bg-yellow-400/10 border border-yellow-400/20 text-yellow-400 hover:bg-yellow-400 hover:text-black"
-                                                    onClick={() => updateStatus(app._id, "saved")}
-                                                />
-                                                <ActionBtn
-                                                    label="✕ Reject"
-                                                    active={app.status === "rejected"}
-                                                    loading={isUpdating}
-                                                    activeClass="bg-red-500 text-white"
-                                                    inactiveClass="bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500 hover:text-white"
-                                                    onClick={() => updateStatus(app._id, "rejected")}
-                                                />
-                                                <ActionBtn
-                                                    label="— Ignore"
+                                                    label="— Reset"
                                                     active={false}
                                                     loading={isUpdating}
                                                     activeClass=""

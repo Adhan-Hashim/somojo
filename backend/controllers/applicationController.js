@@ -26,7 +26,7 @@ exports.applyForJob = async (req, res) => {
         return res.status(403).json({ message: 'Employers cannot apply to jobs' });
     }
 
-    const { coverLetter, resumeUrl } = req.body;
+    const { coverLetter, resumeUrl } = req.body || {};
     const jobId = req.params.jobId;
 
     try {
@@ -73,11 +73,11 @@ exports.applyForJob = async (req, res) => {
                 await emailService.sendApplicationConfirmation(seekerEmail, req.user.name, job);
             }
 
-            if (employerEmail) {
+            if (employerEmail && job.postedBy) {
                 logEmail(`Sending notification to employer: ${employerEmail}`);
                 await emailService.sendEmployerNotification(
                     employerEmail,
-                    job.postedBy.name,
+                    job.postedBy.name || 'Employer',
                     req.user.name,
                     job
                 );
@@ -172,7 +172,21 @@ exports.getJobApplications = async (req, res) => {
             .populate('applicant', ['name', 'email'])
             .sort({ createdAt: -1 });
 
-        res.json(applications);
+        // Manually attach profile details for each applicant
+        const appsWithProfiles = await Promise.all(applications.map(async (app) => {
+            const appObj = app.toObject();
+            const profile = await Profile.findOne({ user: app.applicant._id }).select('skills interests');
+            if (profile) {
+                appObj.applicant.interests = profile.interests || [];
+                appObj.applicant.skills = profile.skills || [];
+            } else {
+                appObj.applicant.interests = [];
+                appObj.applicant.skills = [];
+            }
+            return appObj;
+        }));
+
+        res.json(appsWithProfiles);
     } catch (err) {
         console.error("[getJobApplications] CRITICAL ERROR:", err);
         res.status(500).json({ message: 'Server Error fetching job applications', error: err.message });
@@ -293,5 +307,36 @@ exports.contactCandidate = async (req, res) => {
     } catch (err) {
         console.error("[contactCandidate] CRITICAL ERROR:", err);
         res.status(500).json({ message: 'Server Error sending message', error: err.message });
+    }
+};
+// @desc    Re-trigger AI evaluation (Employer action)
+// @route   POST /api/applications/:applicationId/re-evaluate
+// @access  Private (Employer)
+exports.reEvaluateApplication = async (req, res) => {
+    try {
+        const application = await Application.findById(req.params.applicationId).populate('job');
+        if (!application) return res.status(404).json({ message: 'Application not found' });
+
+        if (application.job.postedBy.toString() !== req.user.id && req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'Not authorized' });
+        }
+
+        const profile = await Profile.findOne({ user: application.applicant });
+        if (!profile) return res.status(404).json({ message: 'Applicant profile not found' });
+
+        const aiResult = await aiService.evaluateCandidate(profile, application.job);
+
+        application.aiMatchScore = aiResult.score;
+        application.aiAnalysis = aiResult.reasoning;
+        await application.save();
+
+        res.json({
+            message: 'AI Evaluation re-triggered successfully',
+            score: application.aiMatchScore,
+            analysis: application.aiAnalysis
+        });
+    } catch (err) {
+        console.error("[reEvaluateApplication] ERROR:", err);
+        res.status(500).json({ message: 'Failed to re-evaluate application', error: err.message });
     }
 };

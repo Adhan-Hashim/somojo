@@ -31,23 +31,27 @@ exports.registerUser = async (req, res) => {
         });
 
         // Send the OTP via email
+        let emailSent = true;
         try {
             await emailService.sendOTPEmail(email, otpCode, name);
         } catch (emailErr) {
+            emailSent = false;
             console.error("Failed to send OTP email:", emailErr);
             // For development/testing, log the OTP to console as fallback
             console.log(`\n=== OTP FALLBACK ===`);
             console.log(`Email: ${email}`);
             console.log(`OTP Code: ${otpCode}`);
             console.log(`===================\n`);
-            return res.status(500).json({ message: 'Failed to send OTP email. Check server logs for the OTP code.', error: emailErr.message });
         }
 
         // Return a response signaling the frontend to switch to the OTP screen
         res.status(200).json({
-            message: 'OTP sent to your email. Please verify to complete registration.',
+            message: emailSent
+                ? 'OTP sent to your email. Please verify to complete registration.'
+                : 'Account created, but OTP email failed. Please use the code from server logs.',
             email: email,
-            requiresOTP: true
+            requiresOTP: true,
+            emailError: !emailSent
         });
     } catch (err) {
         console.error(err.message);
@@ -113,7 +117,7 @@ exports.verifyOTP = async (req, res) => {
         jwt.sign(
             payload,
             process.env.JWT_SECRET,
-            { expiresIn: '5h' },
+            { expiresIn: '7d' },
             (err, token) => {
                 if (err) throw err;
                 res.json({
@@ -186,6 +190,34 @@ exports.loginUser = async (req, res) => {
             return res.status(400).json({ message: 'Invalid Credentials' });
         }
 
+        // 🔥 ADMIN SECURITY: Force OTP for the official admin email
+        if (email === 'showmorejobs@gmail.com' || user.role === 'admin') {
+            const otpCode = generateOTP();
+            await OTP.findOneAndDelete({ email });
+            await OTP.create({ email, otp: otpCode });
+
+            try {
+                await emailService.sendOTPEmail(email, otpCode, user.name);
+                return res.status(200).json({
+                    message: 'Admin OTP sent for verification',
+                    email: email,
+                    requiresOTP: true,
+                    isAdmin: true
+                });
+            } catch (emailErr) {
+                console.log(`\n=== ADMIN LOGIN OTP FALLBACK ===`);
+                console.log(`Email: ${email}`);
+                console.log(`OTP Code: ${otpCode}`);
+                console.log(`==============================\n`);
+                return res.status(200).json({
+                    message: 'Admin OTP triggered (check console for code)',
+                    email: email,
+                    requiresOTP: true,
+                    isAdmin: true
+                });
+            }
+        }
+
 
         // Return JWT
         const payload = {
@@ -197,7 +229,7 @@ exports.loginUser = async (req, res) => {
         jwt.sign(
             payload,
             process.env.JWT_SECRET,
-            { expiresIn: '5h' },
+            { expiresIn: '7d' },
             (err, token) => {
                 if (err) throw err;
                 res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
@@ -219,5 +251,42 @@ exports.getUser = async (req, res) => {
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Server Error');
+    }
+};
+
+// @desc    Verify Admin Login OTP
+// @route   POST /api/auth/verify-admin-otp
+// @access  Public
+exports.verifyAdminLoginOTP = async (req, res) => {
+    const { email, otp } = req.body;
+
+    try {
+        const otpRecord = await OTP.findOne({ email });
+        if (!otpRecord || otpRecord.otp !== otp) {
+            return res.status(400).json({ message: 'Invalid or expired OTP' });
+        }
+
+        const user = await User.findOne({ email });
+        if (!user || user.role !== 'admin') {
+            return res.status(403).json({ message: 'Unauthorized' });
+        }
+
+        // Cleanup OTP
+        await OTP.deleteOne({ email });
+
+        // Issue JWT
+        const payload = { user: { id: user.id } };
+        jwt.sign(
+            payload,
+            process.env.JWT_SECRET,
+            { expiresIn: '5h' },
+            (err, token) => {
+                if (err) throw err;
+                res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+            }
+        );
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).json({ message: 'Server Error', error: err.message });
     }
 };

@@ -35,7 +35,7 @@ export function useThemeColor() {
         };
     }
 
-    // Default to Student/JobSeeker context
+    // Default to JobSeeker context
     return {
         isEmployer: false,
         themeColor: '#5CB144',           // Main Green

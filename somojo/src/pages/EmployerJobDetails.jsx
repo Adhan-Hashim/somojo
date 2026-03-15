@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { MapPinHouse, FileUser } from "lucide-react";
 import { useThemeColor } from "../hooks/useThemeColor";
 import api from "../api";
 
@@ -7,7 +8,7 @@ export default function EmployerJobDetails() {
     const { jobId } = useParams();
     const navigate = useNavigate();
     const { themeBg, themeText } = useThemeColor();
-    
+
     const [job, setJob] = useState(null);
     const [applications, setApplications] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -20,10 +21,10 @@ export default function EmployerJobDetails() {
         const fetchJobAndApplications = async () => {
             setLoading(true);
             try {
-                const jobRes = await api.get(`/jobs/${jobId}`);
+                const jobRes = await api.get(`/api/jobs/${jobId}`);
                 setJob(jobRes.data);
 
-                const appRes = await api.get(`/applications/job/${jobId}`);
+                const appRes = await api.get(`/api/applications/job/${jobId}`);
                 setApplications(appRes.data);
             } catch (err) {
                 console.error("Failed to fetch data", err);
@@ -44,7 +45,7 @@ export default function EmployerJobDetails() {
 
     const handleUpdateApplicationStatus = async (applicationId, newStatus) => {
         try {
-            await api.put(`/applications/${applicationId}/status`, { status: newStatus });
+            await api.put(`/api/applications/${applicationId}/status`, { status: newStatus });
             setApplications(prev =>
                 prev.map(app =>
                     app._id === applicationId ? { ...app, status: newStatus } : app
@@ -63,7 +64,7 @@ export default function EmployerJobDetails() {
         }
 
         try {
-            await api.post(`/applications/${applicationId}/contact`, {
+            await api.post(`/api/applications/${applicationId}/contact`, {
                 message: contactMessage
             });
             alert("Message sent to candidate!");
@@ -72,6 +73,20 @@ export default function EmployerJobDetails() {
         } catch (err) {
             console.error(err);
             alert("Failed to send message");
+        }
+    };
+
+    const handleReEvaluate = async (applicationId) => {
+        try {
+            const res = await api.post(`/api/applications/${applicationId}/re-evaluate`);
+            setApplications(prev =>
+                prev.map(app =>
+                    app._id === applicationId ? { ...app, aiMatchScore: res.data.score, aiAnalysis: res.data.analysis } : app
+                )
+            );
+        } catch (err) {
+            console.error(err);
+            alert("Failed to re-evaluate application.");
         }
     };
 
@@ -136,7 +151,7 @@ export default function EmployerJobDetails() {
                             <p className={`${themeText} text-xl font-medium mb-6`}>{job.company}</p>
                             <div className="flex flex-wrap gap-3">
                                 <span className="bg-white/5 border border-white/10 px-4 py-2 rounded-xl text-gray-300 flex items-center gap-2">
-                                    <span className="text-gray-500">📍</span> {job.location}
+                                    <MapPinHouse className="w-5 h-5 text-gray-500" /> {job.location}
                                 </span>
                                 <span className="bg-white/5 border border-white/10 px-4 py-2 rounded-xl text-gray-300 flex items-center gap-2">
                                     <span className="text-gray-500">💼</span> {job.type}
@@ -215,11 +230,25 @@ export default function EmployerJobDetails() {
                                                 </div>
                                             </div>
 
-                                            {/* Skills/Interest Tags */}
-                                            <div className="flex flex-wrap gap-2">
-                                                {app.applicant?.interests?.slice(0, 3).map((interest, idx) => (
-                                                    <span key={idx} className="bg-white/5 border border-white/10 px-3 py-1 rounded-lg text-xs text-gray-300 font-medium">
-                                                        {interest}
+                                            {/* Resume Link */}
+                                            {app.resumeUrl && (
+                                                <div className="mt-4">
+                                                    <a
+                                                        href={`http://localhost:5000${app.resumeUrl}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 hover:border-[#CF9EFF]/50 rounded-xl text-sm font-bold text-gray-300 transition-all hover:bg-white/10"
+                                                    >
+                                                        <FileUser className="w-4 h-4" /> View Resume
+                                                    </a>
+                                                </div>
+                                            )}
+
+                                            {/* Skills Tags */}
+                                            <div className="flex flex-wrap gap-2 mt-6">
+                                                {(app.applicant?.skills || app.applicant?.interests || []).slice(0, 5).map((skill, idx) => (
+                                                    <span key={idx} className="bg-[#CF9EFF]/10 border border-[#CF9EFF]/20 px-3 py-1 rounded-lg text-[10px] text-[#CF9EFF] font-bold uppercase tracking-wider">
+                                                        {skill}
                                                     </span>
                                                 ))}
                                             </div>
@@ -230,12 +259,20 @@ export default function EmployerJobDetails() {
                                             <div className="flex justify-between items-start mb-4">
                                                 <span className="text-sm font-bold text-gray-400">✨ AI Match</span>
                                                 <div className={`px-3 py-1 rounded-full border font-bold text-sm ${getScoreColor(app.aiMatchScore)}`}>
-                                                    {app.aiMatchScore ? `${app.aiMatchScore}%` : "Pending"}
+                                                    {app.aiMatchScore && app.aiMatchScore > 0 ? `${app.aiMatchScore}%` : "Pending"}
                                                 </div>
                                             </div>
-                                            <p className="text-gray-400 text-sm leading-relaxed line-clamp-3">
-                                                {app.aiAnalysis || "AI analysis pending..."}
+                                            <p className={`text-sm leading-relaxed mb-3 ${!app.aiAnalysis ? "text-gray-500 italic" : "text-gray-400"}`}>
+                                                {app.aiAnalysis || "AI is currently evaluating this candidate's profile against the job requirements..."}
                                             </p>
+                                            {(!app.aiMatchScore || app.aiMatchScore === 0 || !app.aiAnalysis) && (
+                                                <button
+                                                    onClick={() => handleReEvaluate(app._id)}
+                                                    className="w-full py-2 bg-[#CF9EFF]/10 hover:bg-[#CF9EFF]/20 border border-[#CF9EFF]/30 text-[#CF9EFF] text-xs font-bold rounded-xl transition flex items-center justify-center gap-1"
+                                                >
+                                                    ✨ Regenerate AI Analysis
+                                                </button>
+                                            )}
                                         </div>
 
                                         {/* Action Buttons */}
@@ -244,39 +281,32 @@ export default function EmployerJobDetails() {
                                             <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
                                                 <p className="text-xs text-gray-500 uppercase font-bold mb-2">Current Status</p>
                                                 <p className="text-lg font-bold capitalize text-white mb-3">{app.status || "New"}</p>
-                                                
+
                                                 {/* Status Actions */}
                                                 <div className="space-y-2">
-                                                    <button
-                                                        onClick={() => handleUpdateApplicationStatus(app._id, "accepted")}
-                                                        disabled={app.status === "accepted"}
-                                                        className={`w-full py-2 px-3 rounded-lg text-sm font-bold transition ${
-                                                            app.status === "accepted"
-                                                                ? "bg-[#5CB144]/10 text-[#5CB144]"
-                                                                : "bg-[#5CB144]/10 text-[#5CB144] hover:bg-[#5CB144]/20"
-                                                        }`}
-                                                    >
-                                                        ✓ Accept
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleUpdateApplicationStatus(app._id, "rejected")}
-                                                        disabled={app.status === "rejected"}
-                                                        className={`w-full py-2 px-3 rounded-lg text-sm font-bold transition ${
-                                                            app.status === "rejected"
-                                                                ? "bg-red-500/10 text-red-400"
-                                                                : "bg-red-500/10 text-red-400 hover:bg-red-500/20"
-                                                        }`}
-                                                    >
-                                                        ✕ Reject
-                                                    </button>
+                                                    {app.status !== "accepted" && app.status !== "rejected" && (
+                                                        <>
+                                                            <button
+                                                                onClick={() => handleUpdateApplicationStatus(app._id, "accepted")}
+                                                                className="w-full py-2.5 px-3 rounded-xl text-sm font-bold transition bg-[#5CB144]/10 text-[#5CB144] hover:bg-[#5CB144]/20 border border-[#5CB144]/20"
+                                                            >
+                                                                ✓ Accept
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleUpdateApplicationStatus(app._id, "rejected")}
+                                                                className="w-full py-2.5 px-3 rounded-xl text-sm font-bold transition bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20"
+                                                            >
+                                                                ✕ Reject
+                                                            </button>
+                                                        </>
+                                                    )}
                                                     <button
                                                         onClick={() => handleUpdateApplicationStatus(app._id, "saved")}
                                                         disabled={app.status === "saved"}
-                                                        className={`w-full py-2 px-3 rounded-lg text-sm font-bold transition ${
-                                                            app.status === "saved"
-                                                                ? "bg-[#CF9EFF]/10 text-[#CF9EFF]"
-                                                                : "bg-[#CF9EFF]/10 text-[#CF9EFF] hover:bg-[#CF9EFF]/20"
-                                                        }`}
+                                                        className={`w-full py-2 px-3 rounded-lg text-sm font-bold transition ${app.status === "saved"
+                                                            ? "bg-[#CF9EFF]/10 text-[#CF9EFF]"
+                                                            : "bg-[#CF9EFF]/10 text-[#CF9EFF] hover:bg-[#CF9EFF]/20"
+                                                            }`}
                                                     >
                                                         💾 Save
                                                     </button>

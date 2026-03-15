@@ -81,10 +81,10 @@ export default function About() {
                         className="w-full h-[500px] md:h-[650px] flex flex-row items-stretch justify-center bg-[#050505] border border-white/10 shadow-2xl rounded-2xl overflow-hidden"
                     >
                         {[
-                            { name: 'Adhan', img: '/team/ai_adhan.png', role: 'Visionary' },
-                            { name: 'Anaswara', img: '/team/ai_anaswara.png', role: 'Creative' },
-                            { name: 'Swathi', img: '/team/ai_swathi.png', role: 'Strategist' },
-                            { name: 'Devapriya', img: '/team/ai_devapriya.png', role: 'Architect' }
+                            { name: 'Adhan', img: '/team/ai_adhan.png', role: 'Creator' },
+                            { name: 'Anaswara', img: '/team/ai_anaswara.png', role: 'Creator' },
+                            { name: 'Swathi', img: '/team/ai_swathi.png', role: 'Creator' },
+                            { name: 'Devapriya', img: '/team/ai_devapriya.png', role: 'Creator' }
                         ].map((member, i) => (
                             <div key={i} className="group relative flex-1 hover:flex-[2.5] md:hover:flex-[3] transition-all duration-700 ease-[cubic-bezier(0.25,0.8,0.25,1)] overflow-hidden border-r border-white/20 last:border-r-0 cursor-pointer">
 

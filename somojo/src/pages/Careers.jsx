@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { MapPinHouse } from "lucide-react";
 
 export default function Careers() {
     const openRoles = [
@@ -56,7 +57,7 @@ export default function Careers() {
                                 <h3 className="text-2xl font-bold mb-2 group-hover:text-[#CF9EFF] transition-colors">{role.title}</h3>
                                 <div className="flex gap-4 text-sm text-gray-400">
                                     <span className="flex items-center gap-1">🏢 {role.dept}</span>
-                                    <span className="flex items-center gap-1">📍 {role.location}</span>
+                                    <span className="flex items-center gap-1"><MapPinHouse className="w-3 h-3" /> {role.location}</span>
                                     <span className="flex items-center gap-1">⏱️ {role.type}</span>
                                 </div>
                             </div>

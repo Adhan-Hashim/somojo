@@ -1,5 +1,6 @@
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useState, useEffect } from "react";
+import { MapPinHouse } from "lucide-react";
 import { useThemeColor } from "../hooks/useThemeColor";
 
 import api from "../api";
@@ -18,7 +19,7 @@ export default function JobDetails() {
         const fetchJob = async () => {
             setLoading(true);
             try {
-                const res = await api.get(`/jobs/${id}`);
+                const res = await api.get(`/api/jobs/${id}`);
                 setJob(res.data);
             } catch (err) {
                 console.error("Error fetching job details", err);
@@ -94,7 +95,7 @@ export default function JobDetails() {
 
                             <div className="flex flex-wrap gap-3 mt-6">
                                 <span className="bg-white/5 border border-white/10 px-4 py-2 rounded-xl text-gray-300 flex items-center gap-2">
-                                    <span className="text-gray-500">📍</span> {job.location}
+                                    <MapPinHouse className="w-5 h-5 text-gray-500" /> {job.location}
                                 </span>
                                 <span className="bg-white/5 border border-white/10 px-4 py-2 rounded-xl text-gray-300 flex items-center gap-2">
                                     <span className="text-gray-500">💼</span> {job.type}

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { MapPinHouse, FileUser } from "lucide-react";
 import { useThemeColor } from "../hooks/useThemeColor";
 import api from "../api";
 import LocationInput from "../components/LocationInput";
@@ -14,7 +15,7 @@ export default function Profile() {
         return {
             _id: stored.id || stored._id, // Support different formats
             email: stored.email || "",
-            role: stored.role || "student",
+            role: stored.role || "job-seeker",
             name: stored.name || (stored.email ? stored.email.split('@')[0] : "User Name"),
             contact: stored.contact || "",
             location: stored.location || "",
@@ -34,7 +35,7 @@ export default function Profile() {
     useEffect(() => {
         const fetchProfile = async () => {
             try {
-                const res = await api.get('/profile/me');
+                const res = await api.get('/api/profile/me');
                 const dbProfile = res.data;
 
                 // Merge DB profile into local user state
@@ -49,7 +50,13 @@ export default function Profile() {
                         experience: dbProfile.experience || prev.experience,
                         education: dbProfile.education || prev.education,
                         certifications: dbProfile.certifications || prev.certifications,
-                        jobPreferences: dbProfile.preferences || prev.jobPreferences
+                        jobPreferences: dbProfile.preferences || prev.jobPreferences,
+                        resume: dbProfile.resumeUrl ? {
+                            url: dbProfile.resumeUrl,
+                            name: dbProfile.resumeUrl.split('/').pop(),
+                            size: "Unknown",
+                            uploadedDate: "Prior Session"
+                        } : prev.resume
                     };
                     localStorage.setItem("user", JSON.stringify(merged));
                     return merged;
@@ -76,9 +83,10 @@ export default function Profile() {
                 experience: dataToSync.experience,
                 education: dataToSync.education,
                 certifications: dataToSync.certifications,
-                preferences: dataToSync.jobPreferences
+                preferences: dataToSync.jobPreferences,
+                resumeUrl: dataToSync.resume?.url
             };
-            await api.post('/profile', payload);
+            await api.post('/api/profile', payload);
         } catch (err) {
             console.error("Failed to sync profile to DB", err);
         }
@@ -87,21 +95,15 @@ export default function Profile() {
     // -- Employer Jobs State --
     const [postedJobs, setPostedJobs] = useState([]);
     const [isLoadingJobs, setIsLoadingJobs] = useState(false);
+    const [isAutofilling, setIsAutofilling] = useState(false); // Added for AI autofill loading
 
     useEffect(() => {
         if (user.role === 'employer') {
             const fetchEmployerJobs = async () => {
                 setIsLoadingJobs(true);
                 try {
-                    const res = await api.get('/jobs');
-                    // Filter jobs that belong to the logged-in employer
-                    // We check if the postedBy ObjectId matches user._id, or optionally fallback to matching emails if that was used
-                    const myJobs = res.data.filter(j =>
-                        (j.postedBy && j.postedBy._id === user._id) ||
-                        j.postedBy === user._id ||
-                        j.employerEmail === user.email
-                    );
-                    setPostedJobs(myJobs);
+                    const res = await api.get('/api/jobs/my-jobs');
+                    setPostedJobs(res.data);
                 } catch (err) {
                     console.error("Failed to fetch employer jobs", err);
                 } finally {
@@ -163,7 +165,7 @@ export default function Profile() {
 
     const handleAddExperience = () => {
         if (!newExp.title || !newExp.company) return;
-        const updatedExp = [...user.experience, { ...newExp, document: tempDoc, id: Date.now().toString() }];
+        const updatedExp = [...user.experience, { ...newExp, document: tempDoc, id: Date.now().toString() + Math.random().toString(36).substr(2, 5) }];
         const updated = { ...user, experience: updatedExp };
         setUser(updated);
         syncProfileToBackend(updated);
@@ -174,7 +176,7 @@ export default function Profile() {
 
     const handleAddEducation = () => {
         if (!newEdu.school || !newEdu.degree) return;
-        const updatedEdu = [...user.education, { ...newEdu, document: tempDoc, id: Date.now().toString() }];
+        const updatedEdu = [...user.education, { ...newEdu, document: tempDoc, id: Date.now().toString() + Math.random().toString(36).substr(2, 5) }];
         const updated = { ...user, education: updatedEdu };
         setUser(updated);
         syncProfileToBackend(updated);
@@ -185,7 +187,7 @@ export default function Profile() {
 
     const handleAddCert = () => {
         if (!newCert.name) return;
-        const updatedCert = [...user.certifications, { ...newCert, document: tempDoc, id: Date.now().toString() }];
+        const updatedCert = [...user.certifications, { ...newCert, document: tempDoc, id: Date.now().toString() + Math.random().toString(36).substr(2, 5) }];
         const updated = { ...user, certifications: updatedCert };
         setUser(updated);
         syncProfileToBackend(updated);
@@ -216,10 +218,54 @@ export default function Profile() {
         }
     };
 
-    const handleResumeUpload = (e) => {
+    const handleResumeUpload = async (e) => {
         const file = e.target.files[0];
-        if (file) {
-            setUser(prev => ({ ...prev, resume: { name: file.name, size: (file.size / 1024 / 1024).toFixed(2) + " MB", uploadedDate: new Date().toLocaleDateString() } }));
+        if (!file) return;
+
+        // Start AI Autofill Process
+        setIsAutofilling(true);
+        try {
+            const formData = new FormData();
+            formData.append('resume', file);
+
+            const res = await api.post('/api/profile/upload-resume', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data'
+                }
+            });
+
+            const { profile, message } = res.data;
+
+            // Merge returned data into local state
+            setUser(prev => {
+                const merged = {
+                    ...prev,
+                    resume: {
+                        name: file.name,
+                        size: (file.size / 1024 / 1024).toFixed(2) + " MB",
+                        uploadedDate: new Date().toLocaleDateString(),
+                        url: profile.resumeUrl
+                    },
+                    contact: profile.contact || prev.contact,
+                    location: profile.location || prev.location,
+                    interests: profile.interests || prev.interests,
+                    experience: profile.experience || prev.experience,
+                    education: profile.education || prev.education,
+                    certifications: profile.certifications || prev.certifications,
+                    jobPreferences: profile.preferences || prev.jobPreferences
+                };
+                localStorage.setItem("user", JSON.stringify(merged));
+                return merged;
+            });
+
+            alert(`✨ ${message}`);
+        } catch (err) {
+            console.error("Resume Upload/AI Autofill failed:", err);
+            console.error("Error Response:", err.response?.data);
+            const errMsg = err.response?.data?.message || err.message || "Could not automatically fill profile from resume.";
+            alert(`❌ AI Autofill failed: ${errMsg}`);
+        } finally {
+            setIsAutofilling(false);
         }
     };
 
@@ -230,9 +276,14 @@ export default function Profile() {
         }
     };
 
-    const removeResume = (e) => {
+    const removeResume = async (e) => {
         e.stopPropagation();
         setUser(prev => ({ ...prev, resume: null }));
+        try {
+            await api.post('/api/profile', { resumeUrl: '' });
+        } catch (err) {
+            console.error("Failed to clear resume from backend", err);
+        }
     };
 
     // -- Smooth Scrolling --
@@ -275,7 +326,9 @@ export default function Profile() {
                         <ul className="space-y-2 text-sm text-gray-300 font-medium tracking-wide">
                             {[
                                 { id: 'contact', label: 'Contact Info' },
-                                ...(user.role === 'employer' ? [
+                                ...(user.role === 'admin' ? [
+                                    { id: 'admin-dashboard', label: 'Admin Dashboard', action: () => navigate('/admin') }
+                                ] : user.role === 'employer' ? [
                                     { id: 'posted-jobs', label: 'Posted Jobs' }
                                 ] : [
                                     { id: 'my-applications', label: 'My Applications', action: () => navigate('/my-applications') },
@@ -287,9 +340,9 @@ export default function Profile() {
                                     { id: 'certifications', label: 'Certifications' }
                                 ])
                             ].map(item => (
-                                <li 
-                                    key={item.id} 
-                                    onClick={() => item.action ? item.action() : scrollToSection(item.id)} 
+                                <li
+                                    key={item.id}
+                                    onClick={() => item.action ? item.action() : scrollToSection(item.id)}
                                     className={`cursor-pointer hover:bg-white/5 hover:${themeText} p-3 rounded-xl transition-all duration-300 flex items-center justify-between group`}
                                 >
                                     {item.label}
@@ -355,7 +408,7 @@ export default function Profile() {
                                         />
                                     </div>
                                     <div className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-2 border border-white/5">
-                                        <span className="text-xl grayscale">📍</span>
+                                        <MapPinHouse className="w-5 h-5 text-gray-500" />
                                         <LocationInput
                                             value={headerEdit.location}
                                             onChange={(val) => setHeaderEdit({ ...headerEdit, location: val })}
@@ -379,7 +432,7 @@ export default function Profile() {
                                             <span className={user.contact ? "text-gray-200" : "text-gray-500 italic"}>{user.contact || "Add contact number"}</span>
                                         </div>
                                         <div className="flex items-center justify-center sm:justify-start gap-4">
-                                            <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center border border-white/10">📍</div>
+                                            <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center border border-white/10"><MapPinHouse className="w-4 h-4" /></div>
                                             <span className={user.location ? "text-gray-200" : "text-gray-500 italic"}>{user.location || "Add location"}</span>
                                         </div>
                                     </div>
@@ -406,8 +459,8 @@ export default function Profile() {
                             ) : postedJobs.length > 0 ? (
                                 <div className="space-y-4">
                                     {postedJobs.map((job) => (
-                                        <div 
-                                            key={job._id || job.id} 
+                                        <div
+                                            key={job._id || job.id}
                                             onClick={() => navigate(`/employer/job/${job._id || job.id}`)}
                                             className="group relative bg-white/5 border border-white/5 rounded-2xl p-6 hover:border-white/20 hover:bg-white/10 transition cursor-pointer"
                                         >
@@ -416,7 +469,9 @@ export default function Profile() {
                                                     <h3 className={`text-xl font-bold mb-1 transition text-white group-hover:${themeText}`}>{job.title}</h3>
                                                     <p className={`font-semibold ${themeText} mb-2`}>{job.company}</p>
                                                 </div>
-                                                <span className="bg-[#5CB144]/20 text-[#5CB144] px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider">{job.status || 'Active'}</span>
+                                                <span className={`${job.status === 'pending' ? 'bg-[#f59e0b]/20 text-[#f59e0b]' : 'bg-[#5CB144]/20 text-[#5CB144]'} px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider`}>
+                                                    {job.status === 'pending' ? 'Pending Approval' : 'Active'}
+                                                </span>
                                             </div>
 
                                             <div className="grid grid-cols-2 sm:flex sm:gap-6 mt-4 pt-4 border-t border-white/10">
@@ -433,7 +488,7 @@ export default function Profile() {
                                                     <span className="text-sm text-gray-300 font-medium">{job.type}</span>
                                                 </div>
                                             </div>
-                                            
+
                                             <div className="absolute right-6 top-1/2 transform -translate-y-1/2 text-gray-500 group-hover:text-white group-hover:translate-x-1 transition-all duration-300">
                                                 →
                                             </div>
@@ -454,7 +509,7 @@ export default function Profile() {
                     )}
 
                     {/* Student/Candidate specific sections */}
-                    {user.role !== 'employer' && (
+                    {user.role !== 'employer' && user.role !== 'admin' && (
                         <>
                             {/* Resume Upload and AI Builder */}
                             <div id="resume" className="bg-[#0a0a0a]/80 backdrop-blur-2xl border border-white/10 p-8 sm:p-10 rounded-[40px] relative hover:border-white/20 transition shadow-xl">
@@ -463,12 +518,26 @@ export default function Profile() {
                                 </div>
                                 <input type="file" accept=".pdf,.doc,.docx" className="hidden" ref={resumeInputRef} onChange={handleResumeUpload} />
 
+                                {isAutofilling && (
+                                    <div className="mb-6 flex items-center gap-4 bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl animate-pulse">
+                                        <div className="w-8 h-8 rounded-full border-2 border-t-emerald-400 border-emerald-400/20 animate-spin"></div>
+                                        <p className="text-emerald-400 font-bold text-sm">✨ Somojo AI is analyzing your resume and autofilling your profile...</p>
+                                    </div>
+                                )}
+
                                 {user.resume ? (
                                     <div className="bg-white/5 border border-white/10 rounded-2xl p-6 flex items-center justify-between group">
                                         <div className="flex items-center gap-4">
-                                            <div className={`w-14 h-14 rounded-xl ${themeBg}/20 flex items-center justify-center text-3xl`}>📄</div>
+                                            <div className={`w-14 h-14 rounded-xl ${themeBg}/20 flex items-center justify-center text-3xl shrink-0`}><FileUser className={`w-8 h-8 ${themeText}`} /></div>
                                             <div>
-                                                <p className="font-bold text-lg text-white group-hover:text-blue-200 transition">{user.resume.name}</p>
+                                                <a
+                                                    href={user.resume.url.startsWith('http') ? user.resume.url : `http://localhost:5000${user.resume.url}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="font-bold text-lg text-white hover:text-[#CF9EFF] transition decoration-dotted underline-offset-4 hover:underline"
+                                                >
+                                                    {user.resume.name}
+                                                </a>
                                                 <p className="text-sm text-gray-400">Uploaded {user.resume.uploadedDate} • {user.resume.size}</p>
                                             </div>
                                         </div>
@@ -482,7 +551,7 @@ export default function Profile() {
                                         {/* Upload Option */}
                                         <div onClick={() => resumeInputRef.current?.click()} className={`border-2 border-dashed ${themeBorder}/30 rounded-3xl p-8 flex flex-col items-center justify-center text-center hover:bg-white/5 hover:${themeBorder}/50 transition cursor-pointer group`}>
                                             <div className={`w-16 h-16 rounded-full bg-white/5 mb-4 flex items-center justify-center group-hover:scale-110 transition-transform duration-500`}>
-                                                <span className="text-3xl opacity-50 group-hover:opacity-100 transition">📄</span>
+                                                <FileUser className="w-8 h-8 opacity-50 group-hover:opacity-100 transition" />
                                             </div>
                                             <h3 className="font-bold text-lg mb-1 text-white group-hover:text-gray-200 transition">Upload Resume</h3>
                                             <p className="text-gray-400 text-sm">PDF or DOCX, up to 10MB</p>

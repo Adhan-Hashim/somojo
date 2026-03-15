@@ -19,18 +19,24 @@ const initTransport = async () => {
         // If real SMTP variables are provided, use them
         if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
             console.log(`Initializing SMTP with host: ${process.env.SMTP_HOST}, port: ${process.env.SMTP_PORT}, user: ${process.env.SMTP_USER}`);
-            transporter = nodemailer.createTransport({
-                host: process.env.SMTP_HOST,
-                port: parseInt(process.env.SMTP_PORT) || 587,
-                secure: process.env.SMTP_SECURE === 'true' || process.env.SMTP_PORT == 465,
+            const transportConfig = {
                 auth: {
                     user: process.env.SMTP_USER,
                     pass: process.env.SMTP_PASS,
                 },
-                // Add debug options
                 debug: true,
                 logger: true
-            });
+            };
+
+            if (process.env.SMTP_HOST?.includes('gmail.com')) {
+                transportConfig.service = 'gmail';
+            } else {
+                transportConfig.host = process.env.SMTP_HOST;
+                transportConfig.port = parseInt(process.env.SMTP_PORT) || 587;
+                transportConfig.secure = process.env.SMTP_SECURE === 'true' || process.env.SMTP_PORT == 465;
+            }
+
+            transporter = nodemailer.createTransport(transportConfig);
             console.log("Real SMTP transporter created. Verifying connection...");
             await transporter.verify();
             console.log("✅ SMTP connection verified successfully.");
@@ -91,7 +97,10 @@ exports.sendOTPEmail = async (toEmail, otpCode, userName = "there") => {
     };
 
     try {
-        if (!transporter) await initTransport(); // ensure it's ready
+        if (!transporter) await initTransport();
+        if (!transporter) {
+            throw new Error("SMTP Transporter not initialized. Check server logs.");
+        }
 
         let info = await transporter.sendMail(mailOptions);
 
@@ -265,5 +274,86 @@ exports.sendCandidateMessageNotification = async (seekerEmail, seekerName, job, 
         if (!process.env.SMTP_HOST) console.log("📫 PREVIEW: %s", nodemailer.getTestMessageUrl(info));
     } catch (error) {
         console.error("Error sending message notification email:", error);
+    }
+};
+/**
+ * Notify the site admin that a new job has been posted and requires approval
+ * @param {string} adminEmail 
+ * @param {object} job 
+ * @param {object} employer 
+ */
+exports.sendAdminJobNotification = async (adminEmail, job, employer) => {
+    const adminUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/admin`;
+    const mailOptions = {
+        from: `"Somojo System" <${process.env.SMTP_USER || 'no-reply@somojo.com'}>`,
+        to: adminEmail,
+        subject: `ACTION REQUIRED: New Job Posting Pending Approval - ${job.title}`,
+        html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; border: 1px solid #e53e3e; border-radius: 10px; padding: 20px;">
+                <h2 style="color: #e53e3e;">New Job Approval Requested</h2>
+                <p>Hello Admin,</p>
+                <p>A new job posting has been submitted by <strong>${employer.name}</strong> (${employer.email}) and requires your review before it can be listed publicly.</p>
+                <div style="background-color: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #e53e3e;">
+                    <p style="margin: 5px 0;"><strong>Job Title:</strong> ${job.title}</p>
+                    <p style="margin: 5px 0;"><strong>Company:</strong> ${job.company}</p>
+                    <p style="margin: 5px 0;"><strong>Location:</strong> ${job.location}</p>
+                    <p style="margin: 5px 0;"><strong>Posted At:</strong> ${new Date().toLocaleString()}</p>
+                </div>
+                <div style="margin: 20px 0; text-align: center;">
+                    <a href="${adminUrl}" style="background-color: #e53e3e; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold;">Go to Admin Portal to Approve</a>
+                </div>
+                <p>Please review the listing carefully to ensure it meets platform standards.</p>
+                <br/>
+                <p>System Notification,<br/>The Somojo Engine</p>
+            </div>
+        `
+    };
+
+    try {
+        if (!transporter) await initTransport();
+        let info = await transporter.sendMail(mailOptions);
+        console.log(`Admin Job Notification sent to: ${adminEmail}`);
+        if (!process.env.SMTP_HOST) console.log("📫 PREVIEW: %s", nodemailer.getTestMessageUrl(info));
+    } catch (error) {
+        console.error("Error sending admin job notification email:", error);
+    }
+};
+/**
+ * Notify job seeker that they have saved a job
+ * @param {string} seekerEmail 
+ * @param {string} seekerName 
+ * @param {object} job 
+ */
+exports.sendJobSavedNotification = async (seekerEmail, seekerName, job) => {
+    const mailOptions = {
+        from: `"Somojo Notifications" <${process.env.SMTP_USER || 'no-reply@somojo.com'}>`,
+        to: seekerEmail,
+        subject: `Job Saved: ${job.title} at ${job.company}`,
+        html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; border: 1px solid #eee; border-radius: 10px; padding: 20px;">
+                <h2 style="color: #6366f1;">Job Saved! 📌</h2>
+                <p>Hi ${seekerName || 'there'},</p>
+                <p>You've successfully saved the position of <strong>${job.title}</strong> at <strong>${job.company}</strong> for later.</p>
+                <div style="background-color: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #6366f1;">
+                    <p style="margin: 5px 0;"><strong>Job:</strong> ${job.title}</p>
+                    <p style="margin: 5px 0;"><strong>Company:</strong> ${job.company}</p>
+                    <p style="margin: 5px 0;"><strong>Location:</strong> ${job.location || 'Not specified'}</p>
+                </div>
+                <p>You can find this job and apply when you're ready in your <strong>"My Jobs"</strong> section.</p>
+                <div style="margin: 20px 0; text-align: center;">
+                    <a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard" style="background-color: #6366f1; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold;">View Saved Jobs</a>
+                </div>
+                <br/>
+                <p>Best of luck with your search!<br/>The Somojo Team</p>
+            </div>
+        `
+    };
+
+    try {
+        if (!transporter) await initTransport();
+        await transporter.sendMail(mailOptions);
+        console.log(`Job Saved Notification sent to: ${seekerEmail}`);
+    } catch (error) {
+        console.error("Error sending job saved notification:", error);
     }
 };

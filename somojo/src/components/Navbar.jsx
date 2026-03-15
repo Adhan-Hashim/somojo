@@ -9,6 +9,7 @@ export default function Navbar() {
   const isEmployerContext = ["/employer", "/find-cvs", "/products", "/resources"].includes(location.pathname);
   const { themeText } = useThemeColor();
   const isEmployer = user?.role === "employer";
+  const isAdmin = user?.role === "admin";
 
   const handleLogout = () => {
     localStorage.removeItem("user");
@@ -18,7 +19,7 @@ export default function Navbar() {
   return (
     <div className="sticky top-0 z-50 bg-white/5 backdrop-blur-xl border-b border-white/10 px-6 py-4 flex justify-between items-center transition-all duration-300">
       <div className="flex items-center gap-10">
-        <Link to={user ? (isEmployer ? "/employer" : "/home") : "/"} className={`text-2xl font-bold ${themeText} transition-colors duration-500`}>
+        <Link to={user ? (isAdmin ? "/admin" : (isEmployer ? "/employer" : "/home")) : "/"} className={`text-2xl font-bold ${themeText} transition-colors duration-500`}>
           Somojo
         </Link>
 
@@ -40,6 +41,9 @@ export default function Navbar() {
             {!isEmployer && <Link to="/my-jobs" className="hover:text-white transition">My Jobs</Link>}
             {/* employer-specific links */}
             {isEmployer && <Link to="/employer" className={`${themeText} hover:text-white transition font-bold`}>Dashboard</Link>}
+
+            {/* admin-specific links */}
+            {isAdmin && <Link to="/admin" className={`${themeText} hover:text-white transition font-bold`}>Admin Panel</Link>}
 
             <Link to="/profile" className="hover:text-white transition">Profile</Link>
             <div className="flex items-center gap-4 ml-6 pl-6 border-l border-white/10">

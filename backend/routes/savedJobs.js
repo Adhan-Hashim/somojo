@@ -3,6 +3,8 @@ const router = express.Router();
 const SavedJob = require('../models/SavedJob');
 const Job = require('../models/Job');
 const authMiddleware = require('../middleware/authMiddleware');
+const emailService = require('../services/emailService');
+const User = require('../models/User');
 
 // @route   POST /api/saved-jobs/:jobId
 // @desc    Save a job for later
@@ -34,6 +36,17 @@ router.post('/:jobId', authMiddleware, async (req, res) => {
         });
 
         await savedJob.save();
+
+        // 🔥 Trigger Email Notification
+        try {
+            const seeker = await User.findById(req.user.id);
+            if (seeker) {
+                await emailService.sendJobSavedNotification(seeker.email, seeker.name, job);
+            }
+        } catch (mailErr) {
+            console.error("Failed to send Job Saved email:", mailErr);
+        }
+
         res.status(201).json({ message: 'Job saved successfully' });
     } catch (err) {
         console.error(err.message);

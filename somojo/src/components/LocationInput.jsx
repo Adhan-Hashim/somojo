@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { MapPinHouse } from 'lucide-react';
 
 export default function LocationInput({
     value = "",
@@ -98,7 +99,7 @@ export default function LocationInput({
                             onClick={() => handleSelect(place)}
                             className="px-4 py-3 hover:bg-white/10 cursor-pointer text-sm text-gray-200 border-b border-white/5 last:border-0 transition flex items-start gap-3"
                         >
-                            <span className="text-gray-400 mt-0.5">📍</span>
+                            <span className="text-gray-400 mt-0.5"><MapPinHouse className="w-4 h-4" /></span>
                             <span className="leading-tight">{place.display_name}</span>
                         </li>
                     ))}

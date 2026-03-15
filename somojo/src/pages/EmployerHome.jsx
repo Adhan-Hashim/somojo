@@ -99,20 +99,20 @@ export default function EmployerHome() {
             <div className="w-full border-y border-white/10 bg-white/5 backdrop-blur-md py-10 mt-10 relative z-10">
                 <div className="max-w-6xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
                     <div>
-                        <h4 className="text-4xl text-white font-bold mb-1">500+</h4>
-                        <p className="text-sm text-gray-400 uppercase tracking-widest">Local Employers</p>
+                        <h4 className="text-4xl text-white font-bold mb-1">Smart</h4>
+                        <p className="text-sm text-gray-400 uppercase tracking-widest">AI Precision Matching</p>
                     </div>
                     <div>
-                        <h4 className="text-4xl text-white font-bold mb-1">10k+</h4>
-                        <p className="text-sm text-gray-400 uppercase tracking-widest">Active Candidates</p>
+                        <h4 className="text-4xl text-white font-bold mb-1">Instant</h4>
+                        <p className="text-sm text-gray-400 uppercase tracking-widest">Direct Talent Alerts</p>
                     </div>
                     <div>
-                        <h4 className="text-4xl text-white font-bold mb-1"><span className="text-[#CF9EFF]">24</span>hr</h4>
-                        <p className="text-sm text-gray-400 uppercase tracking-widest">Avg. Time to Hire</p>
+                        <h4 className="text-4xl text-white font-bold mb-1"><span className="text-[#CF9EFF]">Vetted</span></h4>
+                        <p className="text-sm text-gray-400 uppercase tracking-widest">Quality Assured CVs</p>
                     </div>
                     <div>
-                        <h4 className="text-4xl text-white font-bold mb-1">98%</h4>
-                        <p className="text-sm text-gray-400 uppercase tracking-widest">Match Success</p>
+                        <h4 className="text-4xl text-white font-bold mb-1">100%</h4>
+                        <p className="text-sm text-gray-400 uppercase tracking-widest">Local Community Focus</p>
                     </div>
                 </div>
             </div>
