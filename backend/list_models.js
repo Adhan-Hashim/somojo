@@ -1,6 +1,7 @@
 const https = require('https');
+const fs = require('fs');
 const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '.env') });
+require('dotenv').config();
 
 const apiKey = process.env.GEMINI_API_KEY;
 const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`;
@@ -14,8 +15,9 @@ https.get(url, (res) => {
         try {
             const data = JSON.parse(body);
             if (data.models) {
-                const names = data.models.map(m => m.name.split('/').pop());
-                console.log("MODELS_FOUND:" + names.join(","));
+                const names = data.models.map(m => m.name);
+                fs.writeFileSync('available_models.txt', names.join('\n'));
+                console.log("Wrote " + names.length + " models to available_models.txt");
             } else {
                 console.log("NO_MODELS_ERROR:" + JSON.stringify(data));
             }

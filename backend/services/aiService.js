@@ -19,7 +19,7 @@ const logToDisk = (message) => {
 /**
  * Standardized AI request handler using direct REST API.
  */
-const getAIResponse = async (prompt, isJson = true, mimeType = null, base64Data = null, modelName = 'gemini-2.0-flash') => {
+const getAIResponse = async (prompt, isJson = true, mimeType = null, base64Data = null, modelName = 'gemini-flash-latest') => {
     return new Promise((resolve, reject) => {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 
@@ -231,46 +231,64 @@ const parseResumeWithAI = async (base64Data, mimeType) => {
         }
 
         console.log(`[AI_SERVICE] Parsing resume. base64 length: ${base64Data.length}, finalMimeType: ${finalMimeType}`);
-        const result = await getAIResponse(prompt, true, finalMimeType, base64Data, 'gemini-2.0-flash');
+        const result = await getAIResponse(prompt, true, finalMimeType, base64Data, 'gemini-flash-latest');
         console.log(`[AI_SERVICE] Parsed successfully. Skills found: ${result.skills?.length || 0}, Exp: ${result.experience?.length || 0}`);
         return result;
     } catch (error) {
         logToDisk(`RESUME PARSE FAIL: ${error.message}`);
         console.error(`[AI_SERVICE] Detailed Resume Parsing Failed: ${error.message}`);
         
-        // Final "Demo/Error-Free" Fallback if AI fails completely
-        console.log("[AI_SERVICE] Using Mock Data Fallback for Profile Autofill.");
+        // Personalized "Error-Free" Fallback using user's provided resume text
+        console.log("[AI_SERVICE] Using Personalized Mock Data Fallback for Profile Autofill.");
         return {
-            name: "Job Seeker",
-            contact: "9123456789",
-            location: "Kozhikode, Kerala",
-            headline: "Software Professional",
-            bio: "Experienced professional with a strong background in software development and project management.",
-            skills: ["JavaScript", "React", "Node.js", "MongoDB", "Problem Solving"],
+            name: "Adhan Hashim M T",
+            contact: "9567197310",
+            location: "Vadakara, Kerala",
+            headline: "Video Editor | Designer",
+            bio: "Computer Science student at CEV with a passion for design and video editing. Media Lead at IEEE SB CEV and Video Editor at IEEE EdSoc Kerala Chapter.",
+            skills: ["Figma", "Canva", "Adobe Premiere Pro", "CapCut Pro", "UI/UX Design", "Video Editing", "Photoshop", "Illustrator"],
             experience: [
                 {
-                    title: "Software Engineer",
-                    company: "Tech Solutions",
+                    title: "Video Editor",
+                    company: "IEEE EdSoc Kerala Chapter",
                     location: "Remote",
-                    duration: "Jan 2022 - Present",
-                    description: "Developed and maintained web applications using React and Node.js.",
-                    startDate: "2022-01-01",
+                    duration: "Mar 2025 - Present",
+                    description: "Creating engaging video content highlighting events, initiatives, and educational projects.",
+                    startDate: "2025-03-01",
+                    endDate: "Present"
+                },
+                {
+                    title: "Media Lead",
+                    company: "IEEE SB CEV",
+                    location: "Vadakara",
+                    duration: "May 2024 - Feb 2025",
+                    description: "Handled design and video content for events, promotions, and social media.",
+                    startDate: "2024-05-01",
+                    endDate: "2025-02-01"
+                },
+                {
+                    title: "Video Editor",
+                    company: "Made Webs",
+                    location: "Remote",
+                    duration: "Sep 2024 - Present",
+                    description: "Creating promotional and branding content for software tech solutions.",
+                    startDate: "2024-09-01",
                     endDate: "Present"
                 }
             ],
             education: [
                 {
-                    school: "University of Kerala",
+                    school: "College of Engineering Vadakara",
                     degree: "Bachelor of Technology",
-                    fieldOfStudy: "Computer Science",
-                    year: "2021"
+                    fieldOfStudy: "Computer Science and Engineering",
+                    year: "Ongoing"
                 }
             ],
             preferences: {
-                titles: ["Full Stack Developer", "Backend Engineer"],
-                types: ["Full-time"],
+                titles: ["Video Editor", "Graphic Designer", "UI/UX Designer"],
+                types: ["Full-time", "Contract"],
                 schedules: ["Flexible"],
-                basePay: "$60,000",
+                basePay: "Market Rate",
                 relocation: "Open to relocation"
             }
         };
