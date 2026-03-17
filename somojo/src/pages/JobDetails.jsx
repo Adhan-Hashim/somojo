@@ -1,6 +1,6 @@
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { MapPinHouse } from "lucide-react";
+import { MapPinHouse, Rocket } from "lucide-react";
 import { useThemeColor } from "../hooks/useThemeColor";
 
 import api from "../api";
@@ -100,24 +100,23 @@ export default function JobDetails() {
                                 <span className="bg-white/5 border border-white/10 px-4 py-2 rounded-xl text-gray-300 flex items-center gap-2">
                                     <span className="text-gray-500">💼</span> {job.type}
                                 </span>
-                                <span className="bg-[#5CB144]/10 border border-[#5CB144]/20 px-4 py-2 rounded-xl text-[#5CB144] font-bold flex items-center gap-2">
-                                    <span className="text-gray-500 opacity-50">💸</span> {job.pay}
-                                </span>
                             </div>
                         </div>
 
                         {/* Apply Action (Header) */}
-                        <div className="w-full md:w-auto flex flex-col items-center md:items-end gap-3 shrink-0">
-                            <button
-                                onClick={handleApply}
-                                className={`w-full md:w-auto ${themeBg} text-black font-extrabold px-8 py-4 rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center justify-center`}
-                            >
-                                Apply Now
-                            </button>
-                            <span className="text-sm text-gray-500 font-medium flex items-center gap-2">
-                                ⏱ Posted {job.posted}
-                            </span>
-                        </div>
+                        {(!user || user.role === 'job-seeker') && (
+                            <div className="w-full md:w-auto flex flex-col items-center md:items-end gap-3 shrink-0">
+                                <button
+                                    onClick={handleApply}
+                                    className={`w-full md:w-auto ${themeBg} text-black font-extrabold px-8 py-4 rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center justify-center`}
+                                >
+                                    Apply Now
+                                </button>
+                                <span className="text-sm text-gray-500 font-medium flex items-center gap-2">
+                                    ⏱ Posted {new Date(job.createdAt).toLocaleString("en-IN", { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                            </div>
+                        )}
                     </div>
 
                     {/* Content Section */}
@@ -159,13 +158,13 @@ export default function JobDetails() {
                                             const lowerB = b.toLowerCase();
                                             if (lowerB.includes("health") || lowerB.includes("medical") || lowerB.includes("dental") || lowerB.includes("vision")) icon = "🏥";
                                             if (lowerB.includes("time off") || lowerB.includes("pto") || lowerB.includes("vacation") || lowerB.includes("holiday")) icon = "🏖️";
-                                            if (lowerB.includes("growth") || lowerB.includes("training") || lowerB.includes("development") || lowerB.includes("education")) icon = "🚀";
+                                            if (lowerB.includes("growth") || lowerB.includes("training") || lowerB.includes("development") || lowerB.includes("education")) icon = <Rocket className="w-5 h-5" />;
                                             if (lowerB.includes("flex") || lowerB.includes("schedule") || lowerB.includes("remote")) icon = "⏰";
                                             if (lowerB.includes("401(k)") || lowerB.includes("retirement") || lowerB.includes("pension") || lowerB.includes("equity")) icon = "📈";
 
                                             return (
                                                 <div key={idx} className="bg-[#CF9EFF]/10 border border-[#CF9EFF]/30 text-[#CF9EFF] px-5 py-3 rounded-xl flex items-center gap-3 w-fit">
-                                                    <span className="text-xl">{icon}</span> {b}
+                                                    {icon} {b}
                                                 </div>
                                             );
                                         })}
@@ -177,23 +176,6 @@ export default function JobDetails() {
 
                         {/* Right Column (Meta Specs) */}
                         <div className="space-y-6">
-                            <div className="bg-white/5 border border-white/5 rounded-2xl p-6">
-                                <h4 className="font-bold text-gray-300 mb-4 uppercase tracking-wider text-sm">Job Overview</h4>
-                                <ul className="space-y-4 text-gray-400">
-                                    <li>
-                                        <span className="block text-gray-500 text-sm mb-1">Industry</span>
-                                        <span className="font-medium text-white">{job.category || "General"}</span>
-                                    </li>
-                                    <li>
-                                        <span className="block text-gray-500 text-sm mb-1">Job Type</span>
-                                        <span className="font-medium text-white">{job.type}</span>
-                                    </li>
-                                    <li>
-                                        <span className="block text-gray-500 text-sm mb-1">Applicants</span>
-                                        <span className="font-medium text-white">{job.applicants || 0} people applied</span>
-                                    </li>
-                                </ul>
-                            </div>
                         </div>
                     </div>
 

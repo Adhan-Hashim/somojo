@@ -141,7 +141,8 @@ exports.getMyApplications = async (req, res) => {
             appliedAt: app.createdAt,
             updatedAt: app.updatedAt,
             lastStatusUpdate: app.lastStatusUpdate,
-            job: app.job
+            job: app.job,
+            agreement: app.agreement
         }));
 
         res.json(formattedApplications);
@@ -338,5 +339,125 @@ exports.reEvaluateApplication = async (req, res) => {
     } catch (err) {
         console.error("[reEvaluateApplication] ERROR:", err);
         res.status(500).json({ message: 'Failed to re-evaluate application', error: err.message });
+    }
+};
+
+// --- AGREEMENT LIFECYCLE ---
+
+// @desc    Generate a contract draft form using AI
+// @route   POST /api/applications/:applicationId/agreement/generate
+// @access  Private (Employer)
+exports.generateAgreement = async (req, res) => {
+    try {
+        const application = await Application.findById(req.params.applicationId)
+            .populate('job')
+            .populate('applicant', ['name', 'email']);
+
+        if (!application) return res.status(404).json({ message: 'Application not found' });
+
+        if (application.job.postedBy.toString() !== req.user.id) {
+            return res.status(403).json({ message: 'Not authorized' });
+        }
+
+        const fields = await aiService.generateAgreementFormFields(application.job, application.applicant, req.user.name);
+
+        res.json({ fields });
+    } catch (err) {
+        console.error("[generateAgreement] ERROR:", err);
+        res.status(500).json({ message: 'Failed to generate agreement', error: err.message });
+    }
+};
+
+// @desc    Send the agreement to the candidate
+// @route   POST /api/applications/:applicationId/agreement/send
+// @access  Private (Employer)
+exports.sendAgreement = async (req, res) => {
+    try {
+        const { fields, employerSignature } = req.body;
+        const application = await Application.findById(req.params.applicationId)
+            .populate('job')
+            .populate('applicant', ['name', 'email']);
+
+        if (!application) return res.status(404).json({ message: 'Application not found' });
+
+        if (application.job.postedBy.toString() !== req.user.id) {
+            return res.status(403).json({ message: 'Not authorized' });
+        }
+
+        application.agreement = {
+            fields,
+            employerSignature,
+            status: 'sent',
+            sentAt: Date.now()
+        };
+
+        await application.save();
+
+        // Format fields for email
+        const formattedContent = fields.map(f => `**${f.question}:** ${f.answer}`).join('\n');
+
+        // Send Email to candidate
+        await emailService.sendAgreementToCandidate(
+            application.applicant.email,
+            application.applicant.name,
+            application.job,
+            formattedContent
+        );
+
+        res.json({ message: 'Agreement sent to candidate', application });
+    } catch (err) {
+        console.error("[sendAgreement] ERROR:", err);
+        res.status(500).json({ message: 'Failed to send agreement', error: err.message });
+    }
+};
+
+// @desc    Candidate accepts and signs the agreement
+// @route   POST /api/applications/:applicationId/agreement/accept
+// @access  Private (Job Seeker)
+exports.candidateAcceptAgreement = async (req, res) => {
+    try {
+        const { signature } = req.body;
+        const application = await Application.findById(req.params.applicationId)
+            .populate('job')
+            .populate('applicant', ['name', 'email'])
+            .populate({
+                path: 'job',
+                populate: { path: 'postedBy', select: 'name email' }
+            });
+
+        if (!application) return res.status(404).json({ message: 'Application not found' });
+
+        if (application.applicant._id.toString() !== req.user.id) {
+            return res.status(403).json({ message: 'Only the applicant can accept this agreement' });
+        }
+
+        if (application.agreement.status !== 'sent') {
+            return res.status(400).json({ message: 'No pending agreement found for this application' });
+        }
+
+        application.agreement.status = 'accepted';
+        application.agreement.candidateSignature = signature;
+        application.agreement.acceptedAt = Date.now();
+        application.status = 'accepted';
+
+        await application.save();
+
+        // Format fields for final email
+        const formattedContent = application.agreement.fields.map(f => `**${f.question}:** ${f.answer}`).join('\n');
+
+        // Send finalized copies to both
+        const employerEmail = application.job.postedBy.email;
+        const candidateEmail = application.applicant.email;
+
+        await emailService.sendFinalAgreementCopies(
+            [employerEmail, candidateEmail],
+            application.job,
+            formattedContent
+        );
+
+        res.json({ message: 'Agreement accepted and finalized', application });
+    } catch (err) {
+        console.error("[candidateAcceptAgreement] ERROR:", err);
+        res.status(500).json({ message: 'Failed to accept agreement', error: err.message });
     }
 };

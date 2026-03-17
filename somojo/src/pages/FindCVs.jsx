@@ -1,7 +1,9 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../api";
 
 export default function FindCVs() {
+    const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState("search"); // 'search' or 'saved'
     const [query, setQuery] = useState("");
     const [results, setResults] = useState([]);
@@ -124,7 +126,10 @@ export default function FindCVs() {
                                         )}
                                     </div>
 
-                                    <button className="w-full bg-[#CF9EFF]/10 hover:bg-[#CF9EFF]/30 text-[#CF9EFF] font-semibold py-3 rounded-xl border border-[#CF9EFF]/30 transition">
+                                    <button 
+                                        onClick={() => navigate(`/candidate/${resume.user._id}`)}
+                                        className="w-full bg-[#CF9EFF]/10 hover:bg-[#CF9EFF]/30 text-[#CF9EFF] font-semibold py-3 rounded-xl border border-[#CF9EFF]/30 transition"
+                                    >
                                         View Full Profile
                                     </button>
                                 </div>

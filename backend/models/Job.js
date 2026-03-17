@@ -63,6 +63,10 @@ const JobSchema = new mongoose.Schema({
         type: String,
         enum: ['active', 'closed', 'draft', 'pending'],
         default: 'pending'
+    },
+    category: {
+        type: String,
+        default: 'Other'
     }
 }, { timestamps: true });
 

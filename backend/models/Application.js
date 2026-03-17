@@ -50,7 +50,22 @@ const ApplicationSchema = new mongoose.Schema({
             type: Date,
             default: Date.now,
         }
-    }]
+    }],
+    agreement: {
+        fields: [{
+            question: String,
+            answer: String,
+        }],
+        status: {
+            type: String,
+            enum: ['none', 'pending', 'sent', 'accepted', 'rejected'],
+            default: 'none',
+        },
+        employerSignature: String,
+        candidateSignature: String,
+        sentAt: Date,
+        acceptedAt: Date,
+    }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Application', ApplicationSchema);

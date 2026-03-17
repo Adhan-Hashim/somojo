@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { MapPinHouse, FileUser } from "lucide-react";
+import { MapPinHouse, FileUser, Pencil } from "lucide-react";
 import { useThemeColor } from "../hooks/useThemeColor";
 import api from "../api";
 import LocationInput from "../components/LocationInput";
@@ -366,7 +366,7 @@ export default function Profile() {
                                 }}
                                 className={`absolute top-8 right-8 cursor-pointer opacity-50 hover:opacity-100 ${themeText} transition flex items-center gap-2 font-bold bg-white/5 px-4 py-2 rounded-xl`}
                             >
-                                ✏️ Edit
+                                <Pencil className="w-4 h-4" /> Edit
                             </button>
                         ) : (
                             <div className="absolute top-8 right-8 flex gap-3 z-20">
@@ -661,7 +661,7 @@ export default function Profile() {
                                     <h2 className="text-2xl font-extrabold tracking-tight">Skills & Interests</h2>
                                     {editingSection !== 'skills' && (
                                         <button onClick={() => { setInterestsEdit(user.interests.join(", ")); setEditingSection('skills'); }} className={`px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 ${themeText} font-bold border border-white/5 flex gap-2 items-center transition`}>
-                                            ✏️ Edit
+                                            <Pencil className="w-4 h-4" /> Edit
                                         </button>
                                     )}
                                 </div>
@@ -710,7 +710,7 @@ export default function Profile() {
                                             });
                                             setEditingSection('prefs');
                                         }} className={`px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 ${themeText} font-bold border border-white/5 flex gap-2 items-center transition`}>
-                                            ✏️ Edit
+                                            <Pencil className="w-4 h-4" /> Edit
                                         </button>
                                     )}
                                 </div>

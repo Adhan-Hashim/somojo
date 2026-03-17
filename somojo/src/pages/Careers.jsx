@@ -10,7 +10,6 @@ export default function Careers() {
 
     const perks = [
         { icon: "🌍", title: "Work Anywhere", desc: "Remote-first culture allowing you to work from anywhere." },
-        { icon: "💸", title: "Competitive Salary", desc: "Top of market compensation and equity packages." },
         { icon: "🩺", title: "Health Focus", desc: "Premium health, dental, and vision insurance for you and your family." },
         { icon: "🏄", title: "Unlimited PTO", desc: "Take the time you need to recharge and come back inspired." }
     ];

@@ -29,6 +29,7 @@ import JobApplication from "./pages/JobApplication";
 import EmployerJobDetails from "./pages/EmployerJobDetails";
 import MyApplications from "./pages/MyApplications";
 import MyJobs from "./pages/MyJobs";
+import CandidateProfile from "./pages/CandidateProfile";
 import AdminPage from "./pages/AdminPage";
 import CustomCursor from "./components/CustomCursor";
 import Preloader from "./components/Preloader";
@@ -114,6 +115,7 @@ function Layout() {
             <Route path="/dashboard/applications/:jobId" element={<PrivateRoute allowedRole="employer"><EmployerApplications /></PrivateRoute>} />
             <Route path="/interview" element={<PrivateRoute><SmartInterview /></PrivateRoute>} />
             <Route path="/my-jobs" element={<PrivateRoute><MyJobs /></PrivateRoute>} />
+            <Route path="/candidate/:id" element={<PrivateRoute allowedRole="employer"><CandidateProfile /></PrivateRoute>} />
             <Route path="/admin" element={<PrivateRoute allowedRole="admin"><AdminPage /></PrivateRoute>} />
           </Routes>
         </main>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../api";
+import { CheckCircle } from "lucide-react";
 
 const STATUS_CONFIG = {
     applied: { label: "Applied", color: "text-blue-400", bg: "bg-blue-400/10", border: "border-blue-400/20" },
@@ -318,7 +319,7 @@ export default function EmployerApplications() {
                                                 )}
                                                 {app.status === "accepted" && (
                                                     <div className="w-full py-2.5 px-4 rounded-xl font-bold text-sm bg-[#5CB144]/10 border border-[#5CB144]/30 text-[#5CB144] text-center">
-                                                        Approved ✅
+                                                        Approved <CheckCircle className="w-4 h-4 inline-block ml-1" />
                                                     </div>
                                                 )}
                                                 <ActionBtn

@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { MapPinHouse } from "lucide-react";
+import { MapPinHouse, Bookmark, Rocket, CheckCircle } from "lucide-react";
 import { useThemeColor } from "../hooks/useThemeColor";
 import api from "../api";
 
 const STATUS_CONFIG = {
-    applied: { label: "Applied", color: "text-blue-400", bg: "bg-blue-400/10", border: "border-blue-400/20", icon: "🚀" },
-    accepted: { label: "Accepted", color: "text-[#5CB144]", bg: "bg-[#5CB144]/10", border: "border-[#5CB144]/20", icon: "✅" },
+    applied: { label: "Applied", color: "text-blue-400", bg: "bg-blue-400/10", border: "border-blue-400/20", icon: <Rocket className="w-4 h-4" /> },
+    accepted: { label: "Accepted", color: "text-[#5CB144]", bg: "bg-[#5CB144]/10", border: "border-[#5CB144]/20", icon: <CheckCircle className="w-4 h-4" /> },
     rejected: { label: "Rejected", color: "text-red-400", bg: "bg-red-400/10", border: "border-red-400/20", icon: "❌" },
     saved: { label: "Shortlisted", color: "text-yellow-400", bg: "bg-yellow-400/10", border: "border-yellow-400/20", icon: "⭐" },
     withdrawn: { label: "Withdrawn", color: "text-gray-400", bg: "bg-gray-400/10", border: "border-gray-400/20", icon: "↩️" },
@@ -120,8 +120,8 @@ export default function MyJobs() {
     }
 
     const tabs = [
-        { id: "applied", label: "Applied Jobs", count: applied.length, icon: "🚀" },
-        { id: "saved", label: "Saved Jobs", count: saved.length, icon: "🔖" },
+        { id: "applied", label: "Applied Jobs", count: applied.length, icon: <Rocket className="w-4 h-4" /> },
+        { id: "saved", label: "Saved Jobs", count: saved.length, icon: <Bookmark className="w-4 h-4" /> },
     ];
 
     return (
@@ -174,7 +174,7 @@ export default function MyJobs() {
                 {activeTab === "applied" && (
                     applied.length === 0 ? (
                         <EmptyState
-                            icon="🚀"
+                            icon={<Rocket className="w-6 h-6" />}
                             title="No applications yet"
                             desc="Start applying to jobs and your applications will appear here with live status updates."
                             btnLabel="Browse Jobs"
@@ -256,7 +256,7 @@ export default function MyJobs() {
                                                 <div className="flex flex-wrap gap-2 text-xs text-gray-400 my-3">
                                                     {job.location && <span className="bg-white/5 border border-white/5 px-2.5 py-1 rounded-lg flex items-center gap-1"><MapPinHouse className="w-3 h-3" /> {job.location}</span>}
                                                     {job.type && <span className="bg-white/5 border border-white/5 px-2.5 py-1 rounded-lg">💼 {job.type}</span>}
-                                                    {job.pay && <span className="bg-[#5CB144]/10 border border-[#5CB144]/10 px-2.5 py-1 rounded-lg text-[#5CB144] font-bold">💸 {job.pay}</span>}
+                                                    {job.pay && <span className="bg-[#5CB144]/10 border border-[#5CB144]/10 px-2.5 py-1 rounded-lg text-[#5CB144] font-bold">{job.pay}</span>}
                                                 </div>
 
                                                 <div className="flex justify-between items-center pt-3 border-t border-white/5">
@@ -293,7 +293,7 @@ export default function MyJobs() {
                 {activeTab === "saved" && (
                     saved.length === 0 ? (
                         <EmptyState
-                            icon="🔖"
+                            icon={<Bookmark className="w-6 h-6" />}
                             title="No saved jobs"
                             desc='Tap the "Save Job" button on any job page and it will appear here.'
                             btnLabel="Browse Jobs"
@@ -321,13 +321,13 @@ export default function MyJobs() {
                                                     <p className="text-gray-400 text-sm">{job.company}</p>
                                                 </div>
                                                 <span className="self-start text-xs font-bold px-3 py-1.5 rounded-full border bg-yellow-400/10 border-yellow-400/20 text-yellow-400">
-                                                    🔖 Saved
+                                                <Bookmark className="w-3 h-3" /> Saved
                                                 </span>
                                             </div>
                                             <div className="flex flex-wrap gap-2 text-xs text-gray-400 mb-3">
                                                 {job.location && <span className="bg-white/5 border border-white/5 px-2.5 py-1 rounded-lg flex items-center gap-1"><MapPinHouse className="w-3 h-3" /> {job.location}</span>}
                                                 {job.type && <span className="bg-white/5 border border-white/5 px-2.5 py-1 rounded-lg">💼 {job.type}</span>}
-                                                {job.pay && <span className="bg-[#5CB144]/10 border border-[#5CB144]/10 px-2.5 py-1 rounded-lg text-[#5CB144] font-bold">💸 {job.pay}</span>}
+                                                {job.pay && <span className="bg-[#5CB144]/10 border border-[#5CB144]/10 px-2.5 py-1 rounded-lg text-[#5CB144] font-bold">{job.pay}</span>}
                                             </div>
                                             <div className="flex justify-between items-center pt-3 border-t border-white/5">
                                                 <span className="text-xs text-gray-500">

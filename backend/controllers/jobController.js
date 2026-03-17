@@ -38,10 +38,25 @@ exports.getMyJobs = async (req, res) => {
 // @access  Public
 exports.getNearbyJobs = async (req, res) => {
     try {
-        const { lng, lat, maxDistance = 50000 } = req.query;
+        let { lng, lat, maxDistance = 50, q, category } = req.query;
 
         if (!lng || !lat) {
             return res.status(400).json({ message: "Longitude and Latitude are required" });
+        }
+
+        // Distance in meters (1 km = 1000 meters)
+        // If the frontend sends km, we convert. If it sends something already large, assume meters.
+        const distanceInMeters = parseInt(maxDistance) < 1000 ? parseInt(maxDistance) * 1000 : parseInt(maxDistance);
+
+        const matchQuery = { status: 'active' };
+        if (q) {
+            matchQuery.$or = [
+                { title: { $regex: q, $options: 'i' } },
+                { company: { $regex: q, $options: 'i' } }
+            ];
+        }
+        if (category) {
+            matchQuery.category = { $regex: category, $options: 'i' };
         }
 
         const jobs = await Job.aggregate([
@@ -52,8 +67,8 @@ exports.getNearbyJobs = async (req, res) => {
                         coordinates: [parseFloat(lng), parseFloat(lat)]
                     },
                     distanceField: "dist.calculated",
-                    maxDistance: parseInt(maxDistance),
-                    query: { status: 'active' },
+                    maxDistance: distanceInMeters,
+                    query: matchQuery,
                     spherical: true
                 }
             },
@@ -67,6 +82,13 @@ exports.getNearbyJobs = async (req, res) => {
             },
             {
                 $unwind: "$postedBy"
+            },
+            {
+                $project: {
+                    "postedBy.password": 0,
+                    "postedBy.resetPasswordToken": 0,
+                    "postedBy.resetPasswordExpire": 0
+                }
             }
         ]);
 
@@ -88,7 +110,15 @@ exports.getJobById = async (req, res) => {
             return res.status(404).json({ message: 'Job not found' });
         }
 
-        res.json(job);
+        // Count past applicants
+        const Application = require('../models/Application');
+        const applicantCount = await Application.countDocuments({ job: req.params.id });
+
+        // Convert to plain object to add new field
+        const jobObj = job.toObject();
+        jobObj.applicants = applicantCount;
+
+        res.json(jobObj);
     } catch (err) {
         console.error("[getJobById] ERROR:", err.message);
         if (err.kind === 'ObjectId') {
@@ -135,11 +165,15 @@ exports.createJob = async (req, res) => {
             }
         }
 
+        // Auto-categorize using AI
+        const category = await aiService.categorizeJob({ title, description });
+
         const newJob = new Job({
             title,
             company,
             location,
             locationPoint: finalLocationPoint,
+            category,
             type: type || "Full-time",
             workplaceType,
             salary: pay || salary || "Not specified",
@@ -245,5 +279,93 @@ exports.enhanceJob = async (req, res) => {
     } catch (err) {
         console.error("[enhanceJob] ERROR:", err.message);
         res.status(500).json({ message: 'Server Error generating AI Job Description', error: err.message });
+    }
+};
+
+// @desc    Get counts of active jobs by category
+// @route   GET /api/jobs/categories/counts
+// @access  Public
+exports.getCategoryCounts = async (req, res) => {
+    try {
+        const categories = [
+            "Retail & Sales",
+            "Restaurant & Food",
+            "Warehouse",
+            "Customer Support",
+            "Delivery & Driver",
+            "Facilities",
+            "Events",
+            "Healthcare"
+        ];
+
+        // Aggregate counts from database
+        const counts = await Job.aggregate([
+            { $match: { status: 'active' } },
+            { $group: { _id: "$category", count: { $sum: 1 } } }
+        ]);
+
+        // Map counts to our categories, default to 0
+        const result = {};
+        categories.forEach(cat => {
+            const found = counts.find(c => c._id === cat);
+            result[cat] = found ? found.count : 0;
+        });
+
+        res.json(result);
+    } catch (err) {
+        console.error("[getCategoryCounts] ERROR:", err.message);
+        res.status(500).json({ message: 'Server Error fetching category counts', error: err.message });
+    }
+};
+
+exports.getRelatedJobs = async (req, res) => {
+    try {
+        const { q, category } = req.query;
+        const queryText = q || category;
+
+        if (!queryText) {
+            return res.status(400).json({ message: 'Query or category is required for related jobs' });
+        }
+
+        const activeJobs = await Job.find({ status: 'active' });
+        console.log(`[getRelatedJobs] Found ${activeJobs.length} active jobs. Querying for: ${queryText}`);
+        const relatedJobs = await aiService.findRelatedJobsWithAI(queryText, activeJobs);
+        console.log(`[getRelatedJobs] Returning ${relatedJobs.length} related jobs.`);
+
+        res.json(relatedJobs);
+    } catch (err) {
+        console.error("[getRelatedJobs] ERROR:", err.message);
+        res.status(500).json({ message: 'Server Error fetching related jobs', error: err.message });
+    }
+};
+
+// @desc    Bulk re-categorize all jobs using AI (Migration tool)
+// @route   POST /api/jobs/bulk-categorize
+// @access  Private (Admin)
+exports.bulkCategorizeJobs = async (req, res) => {
+    try {
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ message: 'Only admins can run bulk categorization' });
+        }
+
+        const Job = require('../models/Job');
+        const jobs = await Job.find({});
+        let updatedCount = 0;
+
+        for (const job of jobs) {
+            const newCategory = await aiService.categorizeJob({
+                title: job.title,
+                description: job.description
+            });
+            
+            job.category = newCategory;
+            await job.save();
+            updatedCount++;
+        }
+
+        res.json({ message: `Successfully categorized ${updatedCount} jobs`, count: updatedCount });
+    } catch (err) {
+        console.error("[bulkCategorizeJobs] ERROR:", err.message);
+        res.status(500).json({ message: 'Server Error during bulk categorization', error: err.message });
     }
 };

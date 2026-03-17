@@ -49,4 +49,7 @@ router.post('/', authMiddleware, profileController.createOrUpdateProfile);
 // @route   PUT /api/profile/save-job/:jobId
 router.put('/save-job/:jobId', authMiddleware, profileController.toggleSaveJob);
 
+// @route   GET /api/profile/user/:userId
+router.get('/user/:userId', authMiddleware, profileController.getProfileByUserId);
+
 module.exports = router;

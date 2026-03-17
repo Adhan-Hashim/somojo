@@ -442,3 +442,24 @@ exports.uploadResume = async (req, res) => {
         res.status(500).json({ message: "Error processing resume", error: err.message });
     }
 };
+
+// @desc    Get profile by User ID
+// @route   GET /api/profile/user/:userId
+// @access  Public (or Employer restricted)
+exports.getProfileByUserId = async (req, res) => {
+    try {
+        const profile = await Profile.findOne({ user: req.params.userId }).populate('user', ['name', 'email', 'role']);
+
+        if (!profile) {
+            return res.status(404).json({ message: 'Profile not found' });
+        }
+
+        res.json(profile);
+    } catch (err) {
+        console.error(err.message);
+        if (err.kind == 'ObjectId') {
+            return res.status(404).json({ message: 'Profile not found' });
+        }
+        res.status(500).send('Server Error');
+    }
+};

@@ -1,4 +1,4 @@
-import { FileUser } from "lucide-react";
+import { FileUser, Rocket } from "lucide-react";
 
 export default function EmployerProducts() {
     return (
@@ -20,7 +20,7 @@ export default function EmployerProducts() {
                     {
                         title: "Sponsored Jobs",
                         desc: "Get your job in front of more candidates by sponsoring it. Sponsored jobs get up to 3x more applications on average.",
-                        icon: "🚀",
+                        icon: <Rocket size={48} />,
                         color: "from-[#CF9EFF]"
                     },
                     {

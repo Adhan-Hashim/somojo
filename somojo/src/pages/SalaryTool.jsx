@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { Search } from "lucide-react";
 
 export default function SalaryTool() {
     const [query, setQuery] = useState("");
@@ -37,7 +38,7 @@ export default function SalaryTool() {
                 {/* Search Bar */}
                 <form onSubmit={handleSearch} className="relative max-w-2xl mx-auto">
                     <div className="absolute inset-y-0 left-6 flex items-center pointer-events-none">
-                        <span className="text-2xl">🔍</span>
+                        <Search size={24} className="text-gray-400" />
                     </div>
                     <input
                         type="text"

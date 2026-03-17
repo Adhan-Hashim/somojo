@@ -8,14 +8,14 @@ export default function RolePerksTicker({ role }) {
 
     const studentPerks = [
         "🎓 Flexible work schedules",
-        "💸 Instant, reliable payouts",
+        "Instant, reliable payouts",
         "🏢 Top local opportunities",
         "⚡ Fast tracked applications"
     ];
 
     const employerPerks = [
-        "🚀 Hire talent in 24 hours",
-        "✅ Verified candidate profiles",
+        "Hire talent in 24 hours",
+        "Verified candidate profiles",
         "📊 AI-driven smart matching",
         "⏱️ Reduce time-to-hire"
     ];

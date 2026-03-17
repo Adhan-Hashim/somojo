@@ -36,10 +36,12 @@ router.get('/status/:jobId', authMiddleware, async (req, res) => {
         }
 
         res.json({
+            _id: application._id,
             status: application.status,
             appliedAt: application.createdAt,
             aiMatchScore: application.aiMatchScore,
-            aiAnalysis: application.aiAnalysis
+            aiAnalysis: application.aiAnalysis,
+            agreement: application.agreement
         });
     } catch (err) {
         console.error("[applicationStatus] ERROR:", err.message);
@@ -61,5 +63,22 @@ router.post('/:applicationId/re-evaluate', authMiddleware, (req, res) => require
 // @desc    Send message to candidate (Employer only)
 // @access  Private (Employer)
 router.post('/:applicationId/contact', authMiddleware, (req, res) => require('../controllers/applicationController').contactCandidate(req, res));
+
+// --- AGREEMENT ROUTES ---
+
+// @route   POST /api/applications/:applicationId/agreement/generate
+// @desc    Generate a contract draft using AI
+// @access  Private (Employer)
+router.post('/:applicationId/agreement/generate', authMiddleware, (req, res) => require('../controllers/applicationController').generateAgreement(req, res));
+
+// @route   POST /api/applications/:applicationId/agreement/send
+// @desc    Send the agreement to the candidate
+// @access  Private (Employer)
+router.post('/:applicationId/agreement/send', authMiddleware, (req, res) => require('../controllers/applicationController').sendAgreement(req, res));
+
+// @route   POST /api/applications/:applicationId/agreement/accept
+// @desc    Candidate accepts and signs the agreement
+// @access  Private (Job Seeker)
+router.post('/:applicationId/agreement/accept', authMiddleware, (req, res) => require('../controllers/applicationController').candidateAcceptAgreement(req, res));
 
 module.exports = router;

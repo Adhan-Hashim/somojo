@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { MapPinHouse, FileUser } from "lucide-react";
+import { MapPinHouse, FileUser, Rocket } from "lucide-react";
 import api from "../api";
 import LocationInput from "../components/LocationInput";
 
@@ -423,7 +423,7 @@ export default function EmployerDashboard() {
                                             </div>
                                         </div>
                                         <div className="bg-gradient-to-b from-[#f59e0b]/10 to-transparent border border-[#f59e0b]/20 rounded-3xl p-8 flex-1 h-fit">
-                                            <h3 className="text-xl font-bold text-white mb-4">Why Join Us? 🚀</h3>
+                                            <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">Why Join Us? <Rocket className="w-5 h-5 text-[#f59e0b]" /></h3>
                                             <p className="text-[#f59e0b] font-medium leading-relaxed bg-black/30 p-4 rounded-xl border border-[#f59e0b]/30">
                                                 {brandProfile.whyJoinUs}
                                             </p>

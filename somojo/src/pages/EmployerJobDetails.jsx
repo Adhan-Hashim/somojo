@@ -16,6 +16,12 @@ export default function EmployerJobDetails() {
     const [filterStatus, setFilterStatus] = useState("all"); // all, new, accepted, rejected, saved
     const [contactingApplicant, setContactingApplicant] = useState(null);
     const [contactMessage, setContactMessage] = useState("");
+    
+    // Agreement Flow
+    const [draftingAgreement, setDraftingAgreement] = useState(null); // application
+    const [agreementFields, setAgreementFields] = useState([]); // [{ question, answer }]
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [employerSig, setEmployerSig] = useState("");
 
     useEffect(() => {
         const fetchJobAndApplications = async () => {
@@ -54,6 +60,58 @@ export default function EmployerJobDetails() {
         } catch (err) {
             console.error("Failed to update application status", err);
             alert("Failed to update application status");
+        }
+    };
+
+    const handleGenerateAgreementDraft = async (applicationId) => {
+        setIsGenerating(true);
+        try {
+            const res = await api.post(`/api/applications/${applicationId}/agreement/generate`);
+            setAgreementFields(res.data.fields || []);
+        } catch (err) {
+            console.error(err);
+            alert("Failed to generate agreement draft");
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
+    const handleAddField = () => {
+        setAgreementFields([...agreementFields, { question: "", answer: "" }]);
+    };
+
+    const handleUpdateField = (index, key, value) => {
+        const newFields = [...agreementFields];
+        newFields[index][key] = value;
+        setAgreementFields(newFields);
+    };
+
+    const handleRemoveField = (index) => {
+        setAgreementFields(agreementFields.filter((_, i) => i !== index));
+    };
+
+    const handleSendAgreementDraft = async (applicationId) => {
+        if (agreementFields.length === 0 || !employerSig.trim()) {
+            alert("Please provide the agreement fields and your signature.");
+            return;
+        }
+
+        try {
+            await api.post(`/api/applications/${applicationId}/agreement/send`, {
+                fields: agreementFields,
+                employerSignature: employerSig
+            });
+            alert("Agreement sent to candidate!");
+            setDraftingAgreement(null);
+            setAgreementFields([]);
+            setEmployerSig("");
+            
+            // Re-fetch to update status UI
+            const appRes = await api.get(`/api/applications/job/${jobId}`);
+            setApplications(appRes.data);
+        } catch (err) {
+            console.error(err);
+            alert("Failed to send agreement");
         }
     };
 
@@ -157,7 +215,7 @@ export default function EmployerJobDetails() {
                                     <span className="text-gray-500">💼</span> {job.type}
                                 </span>
                                 <span className="bg-[#5CB144]/10 border border-[#5CB144]/20 px-4 py-2 rounded-xl text-[#5CB144] font-bold">
-                                    💸 {job.pay}
+                                    {job.pay}
                                 </span>
                                 <span className="bg-[#CF9EFF]/10 border border-[#CF9EFF]/20 px-4 py-2 rounded-xl text-[#CF9EFF] font-bold">
                                     👥 {applications.length} Applications
@@ -284,13 +342,16 @@ export default function EmployerJobDetails() {
 
                                                 {/* Status Actions */}
                                                 <div className="space-y-2">
-                                                    {app.status !== "accepted" && app.status !== "rejected" && (
+                                                    {app.status !== "accepted" && app.status !== "rejected" && app.agreement?.status !== 'sent' && (
                                                         <>
                                                             <button
-                                                                onClick={() => handleUpdateApplicationStatus(app._id, "accepted")}
+                                                                onClick={() => {
+                                                                    setDraftingAgreement(app);
+                                                                    handleGenerateAgreementDraft(app._id);
+                                                                }}
                                                                 className="w-full py-2.5 px-3 rounded-xl text-sm font-bold transition bg-[#5CB144]/10 text-[#5CB144] hover:bg-[#5CB144]/20 border border-[#5CB144]/20"
                                                             >
-                                                                ✓ Accept
+                                                                ✓ Accept & Start Agreement
                                                             </button>
                                                             <button
                                                                 onClick={() => handleUpdateApplicationStatus(app._id, "rejected")}
@@ -299,6 +360,12 @@ export default function EmployerJobDetails() {
                                                                 ✕ Reject
                                                             </button>
                                                         </>
+                                                    )}
+                                                    {app.agreement?.status === 'sent' && (
+                                                        <div className="bg-[#CF9EFF]/10 border border-[#CF9EFF]/20 p-3 rounded-xl text-center">
+                                                            <p className="text-[#CF9EFF] text-xs font-bold uppercase">Agreement Sent</p>
+                                                            <p className="text-gray-400 text-[10px] mt-1">Awaiting Candidate Signature</p>
+                                                        </div>
                                                     )}
                                                     <button
                                                         onClick={() => handleUpdateApplicationStatus(app._id, "saved")}
@@ -358,6 +425,104 @@ export default function EmployerJobDetails() {
                     )}
                 </div>
             </div>
+
+            {/* Agreement Drafting Modal */}
+            {draftingAgreement && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md">
+                    <div className="bg-[#0a0a0a] border border-white/10 rounded-[30px] w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+                        <div className="p-8 border-b border-white/10 flex justify-between items-center bg-white/5">
+                            <div>
+                                <h2 className="text-2xl font-bold text-white">Draft Employment Agreement</h2>
+                                <p className="text-gray-400 text-sm mt-1">For {draftingAgreement.applicant?.name} • {job.title}</p>
+                            </div>
+                            <button 
+                                onClick={() => setDraftingAgreement(null)}
+                                className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-gray-400 hover:bg-white/10 transition"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                        
+                        <div className="flex-1 overflow-y-auto p-8 space-y-6">
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-center mb-4">
+                                    <label className="text-sm font-bold text-gray-400 uppercase tracking-widest">Agreement Conditions & Terms</label>
+                                    <button 
+                                        onClick={() => handleGenerateAgreementDraft(draftingAgreement._id)}
+                                        disabled={isGenerating}
+                                        className="text-[10px] font-bold text-[#CF9EFF] border border-[#CF9EFF]/30 px-3 py-1 rounded-full bg-[#CF9EFF]/5 hover:bg-[#CF9EFF]/10 transition disabled:opacity-50"
+                                    >
+                                        {isGenerating ? "🤖 AI Filling..." : "✨ AI Autofill Form"}
+                                    </button>
+                                </div>
+                                
+                                <div className="space-y-4">
+                                    {agreementFields.map((field, index) => (
+                                        <div key={index} className="flex gap-4 items-start group">
+                                            <div className="flex-1 space-y-2">
+                                                <input 
+                                                    type="text"
+                                                    value={field.question}
+                                                    onChange={(e) => handleUpdateField(index, 'question', e.target.value)}
+                                                    placeholder="Question/Topic (e.g. Monthly Salary)"
+                                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-white font-bold text-sm focus:outline-none focus:border-[#CF9EFF]/50"
+                                                />
+                                                <textarea
+                                                    value={field.answer}
+                                                    onChange={(e) => handleUpdateField(index, 'answer', e.target.value)}
+                                                    placeholder="Answer/Terms (e.g. 50,000 INR)"
+                                                    className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-gray-300 text-sm focus:outline-none focus:border-[#CF9EFF]/30 resize-none h-20"
+                                                />
+                                            </div>
+                                            <button 
+                                                onClick={() => handleRemoveField(index)}
+                                                className="mt-2 text-gray-500 hover:text-red-400 transition"
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+                                    ))}
+                                    
+                                    <button 
+                                        onClick={handleAddField}
+                                        className="w-full py-4 border-2 border-dashed border-white/10 rounded-2xl text-gray-500 font-bold hover:border-[#CF9EFF]/30 hover:text-[#CF9EFF] transition duration-300"
+                                    >
+                                        + Add New Condition/Field
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+                                <label className="block text-sm font-bold text-gray-400 uppercase tracking-widest mb-3">Employer Digital Signature</label>
+                                <input 
+                                    type="text"
+                                    value={employerSig}
+                                    onChange={(e) => setEmployerSig(e.target.value)}
+                                    placeholder="Type your full name as signature"
+                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#CF9EFF]"
+                                />
+                                <p className="text-[10px] text-gray-500 mt-2 italic">* By typing your name, you agree to the terms listed above.</p>
+                            </div>
+                        </div>
+
+                        <div className="p-8 border-t border-white/10 bg-white/5 flex gap-4">
+                            <button 
+                                onClick={() => setDraftingAgreement(null)}
+                                className="flex-1 py-4 rounded-2xl bg-white/5 hover:bg-white/10 text-white font-bold transition"
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                onClick={() => handleSendAgreementDraft(draftingAgreement._id)}
+                                disabled={agreementFields.length === 0 || !employerSig}
+                                className="flex-[2] py-4 rounded-2xl bg-[#5CB144] hover:bg-[#4a9136] text-white font-bold transition shadow-lg shadow-[#5CB144]/20 disabled:opacity-50"
+                            >
+                                Send Professional Agreement
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

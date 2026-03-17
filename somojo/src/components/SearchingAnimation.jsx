@@ -1,4 +1,4 @@
-import { FileUser } from "lucide-react";
+import { FileUser, Search } from "lucide-react";
 
 export default function SearchingAnimation() {
     return (
@@ -23,7 +23,7 @@ export default function SearchingAnimation() {
                     <div className="relative text-xl">
                         🚶‍♂️
                         <div className="absolute -bottom-1 -right-1 text-[#5CB144] animate-pulse text-sm">
-                            🔍
+                            <Search className="w-3.5 h-3.5" />
                         </div>
                     </div>
                 </div>

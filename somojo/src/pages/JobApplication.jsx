@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { MapPinHouse } from "lucide-react";
+import { MapPinHouse, Bookmark, Rocket, Users } from "lucide-react";
 import { useThemeColor } from "../hooks/useThemeColor";
 import api from "../api";
 
@@ -17,6 +17,11 @@ export default function JobApplication() {
     const [applicationStatus, setApplicationStatus] = useState(null);
     const [isSaved, setIsSaved] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+
+    // Agreement Flow
+    const [viewingAgreement, setViewingAgreement] = useState(null); // application data
+    const [seekerSig, setSeekerSig] = useState("");
+    const [isAccepting, setIsAccepting] = useState(false);
 
     useEffect(() => {
         const fetchJob = async () => {
@@ -87,6 +92,35 @@ export default function JobApplication() {
         }
     };
 
+    const handleAcceptAgreement = async () => {
+        if (!seekerSig.trim()) {
+            alert("Please type your signature to accept.");
+            return;
+        }
+
+        setIsAccepting(true);
+        try {
+            await api.post(`/api/applications/${viewingAgreement._id}/agreement/accept`, {
+                signature: seekerSig
+            });
+            alert("Congratulations! You have accepted the agreement.");
+            setViewingAgreement(null);
+            setSeekerSig("");
+            
+            // Update status local state
+            setApplicationStatus(prev => ({
+                ...prev,
+                status: 'accepted',
+                agreement: { ...prev.agreement, status: 'accepted', candidateSignature: seekerSig }
+            }));
+        } catch (err) {
+            console.error(err);
+            alert("Failed to accept agreement");
+        } finally {
+            setIsAccepting(false);
+        }
+    };
+
     if (loading) {
         return (
             <div className="min-h-screen pt-32 pb-20 px-6 flex justify-center items-center text-white">
@@ -146,9 +180,6 @@ export default function JobApplication() {
                                         </span>
                                         <span className="bg-white/5 border border-white/10 px-4 py-2 rounded-xl text-gray-300 flex items-center gap-2">
                                             <span className="text-gray-500">💼</span> {job.type}
-                                        </span>
-                                        <span className="bg-[#5CB144]/10 border border-[#5CB144]/20 px-4 py-2 rounded-xl text-[#5CB144] font-bold flex items-center gap-2">
-                                            <span className="text-gray-500 opacity-50">💸</span> {job.pay}
                                         </span>
                                     </div>
                                 </div>
@@ -217,48 +248,78 @@ export default function JobApplication() {
                     {/* Sidebar - Application Actions */}
                     <div className="lg:col-span-1">
                         <div className="bg-[#0a0a0a]/90 backdrop-blur-3xl border border-white/10 rounded-[30px] p-8 shadow-2xl sticky top-32 space-y-6">
-                            <div>
                                 <h3 className="text-xl font-bold mb-4 text-white">Application Actions</h3>
-                                <div className="text-sm text-gray-400 mb-6">
-                                    <p>📝 Posted {job.posted}</p>
-                                    <p>👥 {job.applicants} people applied</p>
+                                <div className="text-sm text-gray-400 mb-6 space-y-2">
+                                    <p className="flex items-center gap-2">⏱️ Posted {new Date(job.createdAt).toLocaleString("en-IN", { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                                    <p className="flex items-center gap-2 text-[#CF9EFF] font-semibold bg-[#CF9EFF]/10 w-fit px-3 py-1 rounded-lg">
+                                        <Users className="w-4 h-4" /> {job.applicants || 0} people applied
+                                    </p>
                                 </div>
-                            </div>
 
-                            {/* Apply Now Button */}
-                            <button
-                                onClick={handleApply}
-                                disabled={submitted || submitting}
-                                className={`w-full font-extrabold py-4 px-6 rounded-2xl transition-all flex items-center justify-center gap-2 ${submitted
-                                    ? "bg-[#5CB144]/20 text-[#5CB144] border border-[#5CB144]/30 cursor-default"
-                                    : `${themeBg} text-black hover:scale-105 active:scale-95 shadow-lg`
-                                    } ${submitting ? "opacity-75 cursor-wait" : ""}`}
-                            >
-                                {submitting && <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>}
-                                {submitted ? "✓ Applied" : "🚀 Apply Now"}
-                            </button>
+                            {(!user || user.role === 'job-seeker') ? (
+                                <>
+                                    {/* Apply Now Button */}
+                                    <button
+                                        onClick={handleApply}
+                                        disabled={submitted || submitting}
+                                        className={`w-full font-extrabold py-4 px-6 rounded-2xl transition-all flex items-center justify-center gap-2 ${submitted
+                                            ? "bg-[#5CB144]/20 text-[#5CB144] border border-[#5CB144]/30 cursor-default"
+                                            : `${themeBg} text-black hover:scale-105 active:scale-95 shadow-lg`
+                                            } ${submitting ? "opacity-75 cursor-wait" : ""}`}
+                                    >
+                                        {submitting && <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>}
+                                        {submitted ? "✓ Applied" : <><Rocket className="w-4 h-4 inline-block mr-2" /> Apply Now</>}
+                                    </button>
 
-                            {/* Save/Bookmark Button */}
-                            <button
-                                onClick={handleSaveJob}
-                                className={`w-full font-bold py-3 px-6 rounded-2xl border transition-all flex items-center justify-center gap-2 ${isSaved
-                                    ? "bg-[#5CB144]/20 border-[#5CB144]/30 text-[#5CB144]"
-                                    : "bg-white/5 border-white/10 text-white hover:bg-white/10"
-                                    }`}
-                            >
-                                {isSaved ? "💾 Saved" : "🔖 Save Job"}
-                            </button>
+                                    {/* Save/Bookmark Button */}
+                                    <button
+                                        onClick={handleSaveJob}
+                                        className={`w-full font-bold py-3 px-6 rounded-2xl border transition-all flex items-center justify-center gap-2 ${isSaved
+                                            ? "bg-[#5CB144]/20 border-[#5CB144]/30 text-[#5CB144]"
+                                            : "bg-white/5 border-white/10 text-white hover:bg-white/10"
+                                            }`}
+                                    >
+                                        {isSaved ? "💾 Saved" : <><Bookmark className="w-5 h-5" /> Save Job</>}
+                                    </button>
 
-                            {/* Application Status */}
-                            {applicationStatus && (
-                                <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
-                                    <p className="text-xs text-gray-500 uppercase font-bold mb-2">Your Status</p>
-                                    <p className="text-lg font-bold capitalize text-white">{applicationStatus.status}</p>
-                                    {applicationStatus.appliedAt && (
-                                        <p className="text-xs text-gray-400 mt-2">
-                                            Applied on {new Date(applicationStatus.appliedAt).toLocaleDateString()}
-                                        </p>
+                                    {/* Application Status */}
+                                    {applicationStatus && (
+                                        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-4">
+                                            <div>
+                                                <p className="text-xs text-gray-500 uppercase font-bold mb-2">Your Status</p>
+                                                <div className="flex items-center justify-between">
+                                                    <p className="text-lg font-bold capitalize text-white">{applicationStatus.status}</p>
+                                                    {applicationStatus.agreement?.status === 'sent' && applicationStatus.status !== 'accepted' && (
+                                                        <button 
+                                                            onClick={() => setViewingAgreement(applicationStatus)}
+                                                            className="bg-[#CF9EFF] hover:bg-[#b880f0] text-black px-3 py-1.5 rounded-lg font-bold text-[10px] transition animate-pulse"
+                                                        >
+                                                            📜 Review Agreement
+                                                        </button>
+                                                    )}
+                                                    {applicationStatus.agreement?.status === 'accepted' && (
+                                                        <button 
+                                                            onClick={() => setViewingAgreement(applicationStatus)}
+                                                            className="text-gray-400 hover:text-white transition"
+                                                            title="View Signed Agreement"
+                                                        >
+                                                            📜 View
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            {applicationStatus.appliedAt && (
+                                                <p className="text-[10px] text-gray-500">
+                                                    Applied on {new Date(applicationStatus.appliedAt).toLocaleDateString()}
+                                                </p>
+                                            )}
+                                        </div>
                                     )}
+                                </>
+                            ) : (
+                                <div className="bg-[#CF9EFF]/5 border border-[#CF9EFF]/20 rounded-2xl p-4 text-center">
+                                    <p className="text-sm text-[#CF9EFF] font-medium italic">Viewing as {user.role}</p>
+                                    <p className="text-xs text-gray-500 mt-1">Application options are restricted to candidate accounts.</p>
                                 </div>
                             )}
 
@@ -293,6 +354,82 @@ export default function JobApplication() {
                     </div>
                 </div>
             </div>
+
+            {/* Agreement Review Modal */}
+            {viewingAgreement && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-10">
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => !isAccepting && setViewingAgreement(null)}></div>
+                    <div className="relative w-full max-w-4xl bg-[#0a0a0a] border border-white/10 rounded-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                        <div className="p-8 border-b border-white/10 flex justify-between items-center bg-white/5">
+                            <div>
+                                <h3 className="text-2xl font-bold text-white mb-1">Employement Agreement</h3>
+                                <p className="text-gray-400 text-sm">Review the terms provided by <span className={themeText}>{job.company}</span></p>
+                            </div>
+                            <button onClick={() => setViewingAgreement(null)} className="text-gray-500 hover:text-white transition text-2xl">✕</button>
+                        </div>
+                        
+                        <div className="flex-1 overflow-y-auto p-8 space-y-6">
+                            <div className="bg-white/5 border border-white/10 rounded-2xl p-8 space-y-6">
+                                {viewingAgreement.agreement?.fields?.map((field, index) => (
+                                    <div key={index} className="border-b border-white/5 pb-4 last:border-0 last:pb-0">
+                                        <h4 className="text-[#CF9EFF] text-xs font-bold uppercase tracking-widest mb-2">{field.question}</h4>
+                                        <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap">{field.answer}</p>
+                                    </div>
+                                ))}
+                                {(!viewingAgreement.agreement?.fields || viewingAgreement.agreement.fields.length === 0) && (
+                                    <p className="text-gray-500 italic text-center">No specific terms provided. Please contact the employer for details.</p>
+                                )}
+                            </div>
+
+                            {viewingAgreement.agreement?.status === 'accepted' ? (
+                                <div className="grid grid-cols-2 gap-6 bg-white/5 border border-white/10 rounded-2xl p-6">
+                                    <div className="space-y-1">
+                                        <p className="text-[10px] font-bold text-gray-500 uppercase">Employer Signature</p>
+                                        <p className="text-white font-mono text-lg italic">{viewingAgreement.agreement?.employerSignature}</p>
+                                        <p className="text-[9px] text-gray-600">Signed on {new Date(viewingAgreement.agreement?.sentAt).toLocaleDateString()}</p>
+                                    </div>
+                                    <div className="space-y-1 border-l border-white/10 pl-6">
+                                        <p className="text-[10px] font-bold text-[#5CB144] uppercase">Candidate Signature</p>
+                                        <p className="text-white font-mono text-lg italic">{viewingAgreement.agreement?.candidateSignature}</p>
+                                        <p className="text-[9px] text-gray-600">Signed on {new Date(viewingAgreement.agreement?.acceptedAt).toLocaleDateString()}</p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="bg-[#5CB144]/5 border border-[#5CB144]/20 rounded-2xl p-6">
+                                    <label className="block text-sm font-bold text-[#5CB144] uppercase tracking-widest mb-3">Acceptance & Digital Signature</label>
+                                    <input 
+                                        type="text"
+                                        value={seekerSig}
+                                        onChange={(e) => setSeekerSig(e.target.value)}
+                                        placeholder="Type your full name to sign"
+                                        className="w-full bg-black/40 border border-[#5CB144]/30 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#5CB144]"
+                                    />
+                                    <p className="text-[10px] text-gray-500 mt-2 italic">* By signing, you accept the terms and conditions mentioned above.</p>
+                                </div>
+                            )}
+                        </div>
+
+                        {viewingAgreement.agreement?.status !== 'accepted' && (
+                            <div className="p-8 border-t border-white/10 bg-white/5 flex gap-4">
+                                <button 
+                                    onClick={() => setViewingAgreement(null)}
+                                    className="flex-1 py-4 rounded-2xl bg-white/5 hover:bg-white/10 text-white font-bold transition"
+                                >
+                                    Review Later
+                                </button>
+                                <button 
+                                    onClick={handleAcceptAgreement}
+                                    disabled={!seekerSig || isAccepting}
+                                    className="flex-[2] py-4 rounded-2xl bg-[#5CB144] hover:bg-[#4a9136] text-white font-bold transition shadow-lg shadow-[#5CB144]/20 flex items-center justify-center gap-2 disabled:opacity-50"
+                                >
+                                    {isAccepting && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+                                    Confirm Acceptance
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

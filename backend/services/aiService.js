@@ -19,87 +19,77 @@ const logToDisk = (message) => {
 /**
  * Standardized AI request handler using direct REST API.
  */
-const getAIResponse = async (prompt, isJson = true, mimeType = null, base64Data = null, modelName = 'gemini-flash-latest') => {
+const getAIResponse = async (prompt, isJson = true, mimeType = null, base64Data = null, modelName = 'gemini-flash-latest', retries = 2) => {
     return new Promise((resolve, reject) => {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+        const execute = async (attempt) => {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
 
-        let contents;
-        if (base64Data && mimeType) {
-            contents = [{
-                parts: [
-                    { text: prompt },
-                    { inline_data: { mime_type: mimeType, data: base64Data } }
-                ]
-            }];
-        } else {
-            contents = [{ parts: [{ text: prompt }] }];
-        }
+            let contents;
+            if (base64Data && mimeType) {
+                contents = [{
+                    parts: [
+                        { text: prompt },
+                        { inline_data: { mime_type: mimeType, data: base64Data } }
+                    ]
+                }];
+            } else {
+                contents = [{ parts: [{ text: prompt }] }];
+            }
 
-        const payload = {
-            contents,
-            generation_config: { temperature: 0.1 }
+            const payload = {
+                contents,
+                generation_config: { temperature: 0.1 }
+            };
+
+            const req = https.request(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            }, (res) => {
+                let body = '';
+                res.on('data', (chunk) => body += chunk);
+                res.on('end', async () => {
+                    try {
+                        const data = JSON.parse(body);
+                        
+                        if (data.error) {
+                            if (res.statusCode === 429 && attempt < retries) {
+                                const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
+                                console.log(`[AI_SERVICE] Quota hit (429). Retrying in ${Math.round(delay)}ms... (Attempt ${attempt + 1}/${retries})`);
+                                logToDisk(`QUOTA HIT (429). Retry ${attempt + 1}/${retries} in ${Math.round(delay)}ms`);
+                                setTimeout(() => execute(attempt + 1), delay);
+                                return;
+                            }
+                            logToDisk(`AI ERROR: ${JSON.stringify(data.error)}`);
+                            return reject(new Error(data.error.message || "Gemini API Error"));
+                        }
+
+                        const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                        if (isJson) {
+                            const match = text.match(/[\{\[][\s\S]*[\}\]]/);
+                            if (match) {
+                                try {
+                                    return resolve(JSON.parse(match[0]));
+                                } catch (e) {
+                                    const cleaned = text.replace(/```json|```/g, '').trim();
+                                    return resolve(JSON.parse(cleaned));
+                                }
+                            }
+                            const cleaned = text.replace(/```json|```/g, '').trim();
+                            return resolve(JSON.parse(cleaned));
+                        }
+                        resolve(text.trim());
+                    } catch (err) {
+                        reject(new Error(`Response parsing failed: ${err.message}`));
+                    }
+                });
+            });
+
+            req.on('error', (e) => reject(e));
+            req.write(JSON.stringify(payload));
+            req.end();
         };
 
-        logToDisk(`AI CALL - Model: ${modelName}, JSON: ${isJson}, Multimodal: ${!!base64Data}`);
-        console.log(`[AI_SERVICE] Calling Gemini REST API... (Key present: ${!!apiKey})`);
-        console.log(`[AI_SERVICE] Payload Keys: ${Object.keys(payload)}`);
-        if (payload.contents?.[0]?.parts?.[1]?.inline_data) {
-            console.log(`[AI_SERVICE] Multimodal Data Present: ${payload.contents[0].parts[1].inline_data.mime_type}, Base64 Length: ${payload.contents[0].parts[1].inline_data.data.length}`);
-        }
-        
-        const req = https.request(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        }, (res) => {
-            let body = '';
-            res.on('data', (chunk) => body += chunk);
-            res.on('end', () => {
-                console.log(`[AI_SERVICE] Response Status: ${res.statusCode}`);
-                console.log(`[AI_SERVICE] Raw Response Head: ${body.substring(0, 200)}`);
-                try {
-                    const data = JSON.parse(body);
-                    logToDisk(`AI RESPONSE - Success: ${!data.error}`);
-                    if (data.error) {
-                        logToDisk(`AI ERROR: ${JSON.stringify(data.error)}`);
-                        console.error(`[AI_SERVICE] API Error Details:`, JSON.stringify(data.error, null, 2));
-                        return reject(new Error(data.error.message || "Gemini API Error"));
-                    }
-                    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-                    logToDisk(`AI TEXT (snippet): ${text.substring(0, 200)}...`);
-                    
-                    if (!text) {
-                        console.error(`[AI_SERVICE] No text in response. Data:`, JSON.stringify(data, null, 2));
-                    }
-                    if (isJson) {
-                        // More robust JSON extraction - look for the first { and last }
-                        const match = text.match(/\{[\s\S]*\}/);
-                        if (match) {
-                            try {
-                                const parsed = JSON.parse(match[0]);
-                                logToDisk(`AI JSON PARSED - Experience count: ${parsed.experience?.length || 0}`);
-                                return resolve(parsed);
-                            } catch (parseErr) {
-                                logToDisk(`AI JSON PARSE ERROR: ${parseErr.message}`);
-                                // Fallback to simpler cleaning if regex match fails to parse
-                                const cleaned = text.replace(/```json|```/g, '').trim();
-                                return resolve(JSON.parse(cleaned));
-                            }
-                        }
-                        const cleaned = text.replace(/```json|```/g, '').trim();
-                        return resolve(JSON.parse(cleaned));
-                    }
-                    resolve(text.trim());
-                } catch (err) {
-                    logToDisk(`AI CRITICAL ERROR: ${err.message}`);
-                    console.error(`[AI_SERVICE] Response Parsing Failed. Status: ${res.statusCode}, Body snippet: ${body.substring(0, 500)}`);
-                    reject(new Error(`Response parsing failed: ${err.message}. Raw Body: ${body.substring(0, 100)}`));
-                }
-            });
-        });
-
-        req.on('error', (e) => reject(e));
-        req.write(JSON.stringify(payload));
-        req.end();
+        execute(0);
     });
 };
 
@@ -295,6 +285,200 @@ const parseResumeWithAI = async (base64Data, mimeType) => {
     }
 };
 
+const generateAgreementText = async (jobData, candidateData, employerName) => {
+    try {
+        const prompt = `
+            You are a professional legal assistant. Generate a formal employment agreement/offer letter in Markdown format.
+            - Job Title: ${jobData.title}
+            - Company: ${jobData.company}
+            - Location: ${jobData.location}
+            - Pay: ${jobData.pay || jobData.salary}
+            - Candidate: ${candidateData.name}
+            - Employer Contact: ${employerName}
+
+            The agreement should include:
+            1. Position and Duties
+            2. Compensation and Benefits (based on job data)
+            3. Start Date (placeholder)
+            4. Terms of Employment (Placeholder)
+            5. Signatures section for both parties.
+
+            Respond only with the Markdown text of the agreement.
+        `;
+        return await getAIResponse(prompt, false);
+    } catch (error) {
+        console.error("[AI_SERVICE] generateAgreementText Error:", error.message);
+        
+        // Provide a high-quality professional template if AI fails (e.g. quota exceeded)
+        return `
+# Employment Agreement
+
+**Date:** \${new Date().toLocaleDateString()}
+
+**Between:**
+- **Employer:** \${employerName} (\${jobData.company})
+- **Candidate:** \${candidateData.name}
+
+## 1. Position and Duties
+The Candidate is being hired for the position of **\${jobData.title}**. Responsibilities include the standard functions associated with this role at \${jobData.company}.
+
+## 2. Compensation
+The Candidate will receive a compensation of **\${jobData.pay || jobData.salary || 'as discussed'}**. 
+
+## 3. Terms of Employment
+This is a **\${jobData.type || 'Full-time'}** position located in **\${jobData.location}**. 
+
+## 4. Acceptance
+By signing this document, both parties agree to the terms and conditions of this engagement.
+
+---
+**Employer Signature:** ____________________
+**Candidate Signature:** ____________________
+        `.trim();
+    }
+};
+
+/**
+ * Generate structured agreement form fields
+ */
+const generateAgreementFormFields = async (jobData, candidateData, employerName) => {
+    const prompt = `
+Generate a professional employment agreement for the following:
+- Job: \${jobData.title} at \${jobData.company}
+- Location: \${jobData.location}
+- Candidate: \${candidateData.name}
+- Employer Representative: \${employerName}
+
+Return ONLY a JSON array of objects, where each object has "question" and "answer" keys.
+Focus on these key areas:
+1. Job Position & Role
+2. Compensation (Base Salary, Bonuses)
+3. Working Hours & Schedule
+4. Probation period
+5. Notice period
+6. Leave policy summary
+
+Format:
+[
+  { "question": "Position Title", "answer": "..." },
+  { "question": "Monthly Base Salary", "answer": "..." },
+  ...
+]
+`;
+
+    try {
+        const result = await getAIResponse(prompt, true); // JSON mode
+        // result is already parsed if isJson is true in getAIResponse
+        return Array.isArray(result) ? result : [];
+    } catch (error) {
+        console.error("[AI_SERVICE] generateAgreementFormFields Error:", error.message);
+        // Fallback fields
+        return [
+            { question: "Position Title", answer: jobData.title },
+            { question: "Employer Name", answer: jobData.company },
+            { question: "Employee Name", answer: candidateData.name },
+            { question: "Monthly Salary", answer: jobData.pay || "Discussed separately" },
+            { question: "Location", answer: jobData.location },
+            { question: "Working Hours", answer: "9:00 AM - 6:00 PM, Monday to Friday" },
+            { question: "Notice Period", answer: "1 Month" }
+        ];
+    }
+};
+
+/**
+ * Categorize a job based on title and description
+ */
+const categorizeJob = async (jobDetails) => {
+    const categories = [
+        "Retail & Sales",
+        "Restaurant & Food",
+        "Warehouse",
+        "Customer Support",
+        "Delivery & Driver",
+        "Facilities",
+        "Events",
+        "Healthcare"
+    ];
+
+    const prompt = `
+Categorize the following job post into EXACTLY ONE of these categories: ${categories.join(', ')}.
+If it doesn't fit any exactly, pick the closest one that makes professional sense.
+Only return "Other" if it is completely unrelated to all listed categories.
+
+IMPORTANT SEMANTIC HINTS:
+- "Delivery boy", "Rider", "Courier", "Pickup" -> Delivery & Driver
+- "Cook", "Chef", "Waiter", "Kitchen", "Barista" -> Restaurant & Food
+- "Sales", "Cashier", "Marketing" -> Retail & Sales
+- "Cleaning", "Janitor", "Maintenance" -> Facilities
+- "Nurse", "Caregiver", "Doctor" -> Healthcare
+
+Job Title: ${jobDetails.title}
+Job Description: ${jobDetails.description}
+
+Return ONLY the category name as a string.
+`;
+
+    try {
+        const result = await getAIResponse(prompt, false);
+        const trimmed = result.trim();
+        return categories.includes(trimmed) ? trimmed : "Other";
+    } catch (error) {
+        console.error("[AI_SERVICE] categorizeJob Error:", error.message);
+        return "Other";
+    }
+};
+
+/**
+ * Find related jobs using semantic similarity
+ */
+const findRelatedJobsWithAI = async (queryText, jobsList) => {
+    try {
+        if (!jobsList || jobsList.length === 0) return [];
+        
+        const minJobs = jobsList.map(j => ({ 
+            id: j._id, 
+            title: j.title, 
+            company: j.company,
+            category: j.category 
+        }));
+
+        const prompt = `
+Find the top 5 most related jobs for the query or category: "${queryText}".
+Jobs available: ${JSON.stringify(minJobs)}
+
+Consider semantic similarity and professional field relationships:
+- "Figma", "Adobe", "Design" -> Related to "UI UX", "Graphic Design", "Product Design"
+- "Cook", "Chef", "Kitchen" -> Related to "Restaurant & Food"
+- "Delivery", "Bike", "Rider" -> Related to "Delivery & Driver"
+- "Warehouse", "Packer", "Inventory" -> Related to "Logistics", "Operations"
+- "Customer Support", "Voice", "Chat" -> Related to "Service", "Communication"
+
+Return ONLY a JSON array of job IDs that are most relevant.
+If no jobs are even remotely related, return an empty array [].
+Format: ["id1", "id2", ...]
+`;
+
+        console.log(`[AI_SERVICE] findRelatedJobsWithAI: Query="${queryText}", JobsAvailable=${jobsList.length}`);
+        const result = await getAIResponse(prompt, true);
+        console.log(`[AI_SERVICE] findRelatedJobsWithAI: Result=`, result);
+        
+        // Debug file write
+        try {
+            fs.appendFileSync(path.join(__dirname, '../related_jobs_debug.log'), `[${new Date().toISOString()}] Query: ${queryText} | Result: ${JSON.stringify(result)}\n`);
+        } catch (e) {}
+
+        if (Array.isArray(result)) {
+            const filtered = jobsList.filter(j => result.includes(j._id.toString()));
+            console.log(`[AI_SERVICE] findRelatedJobsWithAI: Returning ${filtered.length} jobs`);
+            return filtered;
+        }
+        return [];
+    } catch (error) {
+        console.error("[AI_SERVICE] findRelatedJobsWithAI Error:", error.message);
+        return [];
+    }
+};
+
 module.exports = {
     evaluateCandidate,
     rankJobsForCandidate,
@@ -302,5 +486,9 @@ module.exports = {
     generateEmployerBranding,
     enhanceJobDescription,
     conductInterview,
-    parseResumeWithAI
+    parseResumeWithAI,
+    generateAgreementText,
+    generateAgreementFormFields,
+    categorizeJob,
+    findRelatedJobsWithAI
 };

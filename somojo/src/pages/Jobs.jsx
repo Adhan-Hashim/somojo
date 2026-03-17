@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { MapPinHouse } from 'lucide-react';
 
@@ -21,6 +21,7 @@ export default function Jobs() {
     // Controlled inputs for the search bar
     const [queryInput, setQueryInput] = useState(searchParams.get('q') || '');
     const [locationInput, setLocationInput] = useState(searchParams.get('loc') || '');
+    const [userCoords, setUserCoords] = useState(null); // { lng, lat }
     const categoryParam = searchParams.get('category');
     const [isLocating, setIsLocating] = useState(false);
 
@@ -31,6 +32,7 @@ export default function Jobs() {
                 async (position) => {
                     try {
                         const { latitude, longitude } = position.coords;
+                        setUserCoords({ lat: latitude, lng: longitude });
                         const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
                         const data = await res.json();
                         const city = data.address.city || data.address.town || data.address.village || data.address.county || data.address.suburb || "Local Area";
@@ -54,7 +56,10 @@ export default function Jobs() {
     };
 
     const [jobs, setJobs] = useState([]);
+    const [relatedJobs, setRelatedJobs] = useState([]);
     const [isSearching, setIsSearching] = useState(true);
+    const [isFetchingRelated, setIsFetchingRelated] = useState(false);
+    const aiDebounceTimer = useRef(null);
 
     // Filter states
     const [activeFilters, setActiveFilters] = useState({
@@ -65,12 +70,38 @@ export default function Jobs() {
     useEffect(() => {
         const fetchJobs = async () => {
             setIsSearching(true);
+            setRelatedJobs([]);
             try {
                 let res;
-                if (user && user.role === 'job-seeker') {
+                // If we have coordinates, ALWAYS use the nearby API for any distance filter
+                if (userCoords && activeFilters.distance) {
+                    let km = 0;
+                    if (activeFilters.distance === 'Exact location') {
+                        km = 3; // Strict 3-km radius for "Exact"
+                    } else {
+                        km = parseInt(activeFilters.distance.match(/\d+/) || [0])[0];
+                    }
+                    
+                    const meters = km * 1000;
+                    res = await api.get('/api/jobs/nearby', {
+                        params: { 
+                            lng: userCoords.lng, 
+                            lat: userCoords.lat, 
+                            maxDistance: meters,
+                            q: searchParams.get('q'),
+                            category: categoryParam
+                        }
+                    });
+                } else if (user && user.role === 'job-seeker' && !searchParams.get('q') && !categoryParam && !searchParams.get('loc')) {
                     res = await api.get('/api/jobs/recommended');
                 } else {
-                    res = await api.get('/api/jobs');
+                    res = await api.get('/api/jobs', {
+                        params: {
+                            q: searchParams.get('q'),
+                            loc: searchParams.get('loc'),
+                            category: categoryParam
+                        }
+                    });
                 }
 
                 let results = res.data;
@@ -93,6 +124,35 @@ export default function Jobs() {
                 }
 
                 setJobs(results);
+
+                // AI Suggestions if no results
+                if (results.length === 0 && (searchParams.get('q') || categoryParam)) {
+                    console.log(`[JOBS] No results found. Triggering AI suggest debounce... (q=${searchParams.get('q')})`);
+                    // Debounce the AI fetch to prevent rapid calls hitting quotas
+                    if (aiDebounceTimer.current) {
+                        clearTimeout(aiDebounceTimer.current);
+                        console.log(`[JOBS] Previous AI debounce cleared.`);
+                    }
+                    
+                    aiDebounceTimer.current = setTimeout(async () => {
+                        console.log(`[JOBS] Executing AI suggestion fetch...`);
+                        setIsFetchingRelated(true);
+                        try {
+                            const relRes = await api.get('/api/jobs/related', {
+                                params: {
+                                    q: searchParams.get('q'),
+                                    category: categoryParam
+                                }
+                            });
+                            console.log(`[JOBS] AI Suggested RESPONSE:`, relRes.data);
+                            setRelatedJobs(relRes.data);
+                        } catch (relErr) {
+                            console.error("[JOBS] Failed to fetch related jobs:", relErr);
+                        } finally {
+                            setIsFetchingRelated(false);
+                        }
+                    }, 1000); // 1.0s debounce
+                }
             } catch (err) {
                 console.error("Failed to fetch jobs:", err);
             } finally {
@@ -101,7 +161,7 @@ export default function Jobs() {
         };
 
         fetchJobs();
-    }, [searchParams, categoryParam, activeFilters, user?.role]);
+    }, [searchParams, categoryParam, activeFilters, userCoords, user?.role]);
 
     const handleSearch = (e) => {
         e.preventDefault();
@@ -251,10 +311,19 @@ export default function Jobs() {
                     <div className="bg-[#0a0a0a]/80 backdrop-blur-2xl border border-white/10 p-7 rounded-[30px] hover:border-white/20 transition-colors">
                         <h3 className="font-bold text-lg mb-5 text-white">Distance</h3>
                         <div className="space-y-4">
-                            {['Exact location', 'Within 5 miles', 'Within 15 miles', 'Within 25 miles'].map((dist) => {
+                            {['Exact location', 'Within 5 km', 'Within 15 km', 'Within 25 km'].map((dist) => {
                                 const isActive = activeFilters.distance === dist;
                                 return (
-                                    <label key={dist} onClick={() => setActiveFilters({ ...activeFilters, distance: dist })} className="flex items-center gap-4 cursor-pointer group">
+                                    <label 
+                                        key={dist} 
+                                        onClick={() => {
+                                            setActiveFilters({ ...activeFilters, distance: dist });
+                                            if (!userCoords) {
+                                                handleLocateMe();
+                                            }
+                                        }} 
+                                        className="flex items-center gap-4 cursor-pointer group"
+                                    >
                                         <div className={`w-6 h-6 rounded-full border flex items-center justify-center transition-all ${isActive ? 'border-[#5CB144]' : 'border-white/20 group-hover:border-[#5CB144]/50'}`}>
                                             <div className={`w-3 h-3 rounded-full bg-[#5CB144] transition-transform duration-300 ${isActive ? 'scale-100' : 'scale-0'}`}></div>
                                         </div>
@@ -349,7 +418,7 @@ export default function Jobs() {
                                                     <span className="text-gray-500">💼</span> {job.type}
                                                 </div>
                                                 <div className="bg-white/5 border border-white/5 px-3 py-1.5 rounded-xl font-bold text-[#5CB144] flex items-center gap-2 group-hover:bg-[#5CB144]/10 transition-colors">
-                                                    <span className="text-gray-500 font-normal">💸</span> {job.pay}
+                                                    {job.pay}
                                                 </div>
                                             </div>
 
@@ -366,7 +435,7 @@ export default function Jobs() {
                                                         onClick={() => navigate(`/apply/${job._id || job.id}`)}
                                                         className="text-[#CF9EFF] font-bold text-sm bg-[#CF9EFF]/10 border border-[#CF9EFF]/20 px-5 py-2 rounded-xl hover:bg-[#CF9EFF] hover:text-black transition-all duration-300 shadow-md"
                                                     >
-                                                        View &amp; Apply →
+                                                        {(!user || user.role === 'job-seeker') ? "View & Apply →" : "View Details →"}
                                                     </button>
                                                 </div>
                                             </div>
@@ -375,17 +444,83 @@ export default function Jobs() {
                                 </div>
                             ))
                         ) : (
-                            <div className="bg-[#0a0a0a]/80 backdrop-blur-2xl border border-white/10 rounded-[40px] p-16 text-center shadow-2xl">
-                                <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6 border border-white/10">
-                                    <span className="text-4xl filter grayscale opacity-50">🧭</span>
+                            <div className="space-y-10">
+                                <div className="bg-[#0a0a0a]/80 backdrop-blur-2xl border border-white/10 rounded-[40px] p-16 text-center shadow-2xl">
+                                    <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6 border border-white/10">
+                                        <span className="text-4xl filter grayscale opacity-50">🧭</span>
+                                    </div>
+                                    <h3 className="text-3xl font-bold mb-4">No exact matches found</h3>
+                                    <p className="text-gray-400 mb-8 max-w-md mx-auto text-lg">
+                                        We couldn't find any opportunities matching your exact criteria right now. Try adjusting your search keywords or location.
+                                    </p>
+                                    <button onClick={clearFilters} className="bg-white hover:bg-gray-200 text-black font-bold py-4 px-10 rounded-2xl transition-all shadow-xl text-lg hover:scale-105">
+                                        Clear Search Filters
+                                    </button>
                                 </div>
-                                <h3 className="text-3xl font-bold mb-4">No exact matches found</h3>
-                                <p className="text-gray-400 mb-8 max-w-md mx-auto text-lg">
-                                    We couldn't find any opportunities matching your exact criteria right now. Try adjusting your search keywords or location.
-                                </p>
-                                <button onClick={clearFilters} className="bg-white hover:bg-gray-200 text-black font-bold py-4 px-10 rounded-2xl transition-all shadow-xl text-lg hover:scale-105">
-                                    Clear Search Filters
-                                </button>
+
+                                {isFetchingRelated ? (
+                                    <div className="text-center py-10">
+                                        <div className="inline-block w-8 h-8 border-4 border-[#CF9EFF]/30 border-t-[#CF9EFF] rounded-full animate-spin mb-4"></div>
+                                        <p className="text-[#CF9EFF] font-medium animate-pulse">AI is finding related opportunities for you...</p>
+                                    </div>
+                                ) : relatedJobs.length > 0 ? (
+                                    <div className="space-y-6">
+                                        <div className="flex items-center gap-4 px-2">
+                                            <div className="h-[2px] flex-1 bg-gradient-to-r from-transparent via-[#CF9EFF]/30 to-transparent"></div>
+                                            <h2 className="text-xl font-bold text-[#CF9EFF] flex items-center gap-2">
+                                                <span className="text-2xl">✨</span> AI Suggested Related Jobs
+                                            </h2>
+                                            <div className="h-[2px] flex-1 bg-gradient-to-r from-transparent via-[#CF9EFF]/30 to-transparent"></div>
+                                        </div>
+                                        
+                                        <div className="space-y-5">
+                                            {relatedJobs.map((job) => (
+                                                <div
+                                                    key={`rel-${job._id || job.id}`}
+                                                    className="group relative bg-[#0a0a0a]/40 backdrop-blur-xl border border-[#CF9EFF]/20 rounded-[30px] p-6 sm:p-8 overflow-hidden transition-all duration-500 hover:-translate-y-1 hover:border-[#CF9EFF]/40 hover:shadow-[0_20px_50px_-10px_rgba(207,158,255,0.1)]"
+                                                >
+                                                    <div className="absolute top-0 right-0 px-4 py-1 bg-[#CF9EFF] text-black text-[10px] font-black uppercase tracking-widest rounded-bl-2xl">
+                                                        AI Recommended
+                                                    </div>
+                                                    
+                                                    <div className="relative z-10 flex flex-col sm:flex-row gap-6">
+                                                        <div className="w-16 h-16 shrink-0 bg-[#111] border border-white/5 rounded-2xl flex items-center justify-center overflow-hidden">
+                                                            <img src={`https://api.dicebear.com/9.x/initials/svg?seed=${job.logoSeed || job.company}&backgroundColor=111111&textColor=ffffff`} alt={job.company} className="w-full h-full object-cover" />
+                                                        </div>
+
+                                                        <div className="flex-1">
+                                                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-2 gap-4">
+                                                                <div>
+                                                                    <h3 className="text-2xl font-bold text-white group-hover:text-[#CF9EFF] transition-colors">{job.title}</h3>
+                                                                    <p className="text-gray-400 font-medium text-lg mt-1">{job.company}</p>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="flex flex-wrap gap-2 mt-4 mb-6">
+                                                                <div className="bg-white/5 px-3 py-1 rounded-xl text-sm text-gray-300 flex items-center gap-2">
+                                                                    <MapPinHouse className="w-4 h-4 text-gray-500" /> {job.location}
+                                                                </div>
+                                                                <div className="bg-[#CF9EFF]/10 border border-[#CF9EFF]/20 px-3 py-1 rounded-xl text-sm text-[#CF9EFF] font-bold">
+                                                                    {job.category}
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="flex justify-between items-center pt-4 border-t border-white/5">
+                                                                <span className="text-[#5CB144] font-bold">{job.pay || job.salary}</span>
+                                                                <button
+                                                                    onClick={() => navigate(`/apply/${job._id || job.id}`)}
+                                                                    className="text-white font-bold text-sm bg-white/10 px-6 py-2 rounded-xl hover:bg-[#CF9EFF] hover:text-black transition-all"
+                                                                >
+                                                                    View Details →
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ) : null}
                             </div>
                         )}
                     </div>

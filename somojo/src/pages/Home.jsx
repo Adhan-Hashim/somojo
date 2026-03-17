@@ -1,14 +1,39 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { MapPinHouse } from "lucide-react";
+import { MapPinHouse, Search } from "lucide-react";
+import api from "../api";
 import LocationInput from "../components/LocationInput";
 
 export default function Home() {
   const navigate = useNavigate();
-  const user = JSON.parse(localStorage.getItem("user"));
+  const user = JSON.parse(localStorage.getItem("user") || "null");
   const [query, setQuery] = useState("");
   const [location, setLocation] = useState("");
   const [isLocating, setIsLocating] = useState(false);
+  const [counts, setCounts] = useState({});
+
+  const categories = [
+    { icon: "🛍️", name: "Retail & Sales", desc: "Customer-facing roles in vibrant local shops and malls." },
+    { icon: "🍔", name: "Restaurant & Food", desc: "Fast-paced opportunities in kitchens, cafes, and dining." },
+    { icon: "📦", name: "Warehouse", desc: "Active roles in packing, sorting, and inventory supply." },
+    { icon: "💻", name: "Customer Support", desc: "Help users succeed with excellent communication skills." },
+    { icon: "🚗", name: "Delivery & Driver", desc: "Hit the road and deliver goods with flexible hours." },
+    { icon: "🧹", name: "Facilities", desc: "Maintain pristine environments in offices and homes." },
+    { icon: "🎉", name: "Events", desc: "Be part of the excitement at concerts and festivals." },
+    { icon: "🏥", name: "Healthcare", desc: "Support communities through essential caregiving roles." }
+  ];
+
+  useEffect(() => {
+    const fetchCounts = async () => {
+      try {
+        const res = await api.get("/api/jobs/categories/counts");
+        setCounts(res.data);
+      } catch (err) {
+        console.error("Error fetching category counts:", err);
+      }
+    };
+    fetchCounts();
+  }, []);
 
   const handleLocateMe = () => {
     if ("geolocation" in navigator) {
@@ -60,10 +85,10 @@ export default function Home() {
         </p>
 
         {/* Big Search Bar */}
-        <form onSubmit={handleSearch} className="w-full max-w-4xl bg-white/5 backdrop-blur-2xl border border-white/10 rounded-3xl p-2 md:p-3 shadow-[0_8px_32px_rgba(0,0,0,0.4)] flex flex-col md:flex-row gap-3 relative z-20">
+        <form onSubmit={handleSearch} className="w-full max-w-4xl border border-white/10 rounded-3xl p-2 md:p-3 shadow-[0_8px_32px_rgba(0,0,0,0.4)] flex flex-col md:flex-row gap-3 relative z-20">
 
-          <div className="flex-1 flex items-center bg-black/40 rounded-2xl px-4 py-3 md:py-0 border border-transparent focus-within:border-gray-600 transition">
-            <span className="text-gray-400 mr-3 text-xl">🔍</span>
+          <div className="flex-1 flex items-center rounded-2xl px-4 py-3 md:py-0 border border-transparent focus-within:border-gray-600 transition">
+            <Search className="text-gray-400 mr-3 w-5 h-5" />
             <div className="flex-1 text-left">
               <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">What</label>
               <div className="flex items-center">
@@ -90,7 +115,7 @@ export default function Home() {
 
           <div className="hidden md:block w-[1px] bg-white/10 my-2"></div>
 
-          <div className="flex-1 flex items-center bg-black/40 rounded-2xl px-4 py-3 md:py-0 border border-transparent focus-within:border-gray-600 transition">
+          <div className="flex-1 flex items-center rounded-2xl px-4 py-3 md:py-0 border border-transparent focus-within:border-gray-600 transition">
             <MapPinHouse className="text-gray-400 mr-3 w-5 h-5" />
             <div className="flex-1 text-left">
               <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-0.5">Where</label>
@@ -147,17 +172,7 @@ export default function Home() {
         <h2 className="text-2xl font-bold mb-8">Browse Categories</h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* Category Cards (Huts.com style) */}
-          {[
-            { icon: "🛍️", name: "Retail & Sales", count: "1,200+ jobs", desc: "Customer-facing roles in vibrant local shops and malls." },
-            { icon: "🍔", name: "Restaurant & Food", count: "2,500+ jobs", desc: "Fast-paced opportunities in kitchens, cafes, and dining." },
-            { icon: "📦", name: "Warehouse", count: "800+ jobs", desc: "Active roles in packing, sorting, and inventory supply." },
-            { icon: "💻", name: "Customer Support", count: "1,500+ jobs", desc: "Help users succeed with excellent communication skills." },
-            { icon: "🚗", name: "Delivery & Driver", count: "3,000+ jobs", desc: "Hit the road and deliver goods with flexible hours." },
-            { icon: "🧹", name: "Facilities", count: "400+ jobs", desc: "Maintain pristine environments in offices and homes." },
-            { icon: "🎉", name: "Events", count: "200+ jobs", desc: "Be part of the excitement at concerts and festivals." },
-            { icon: "🏥", name: "Healthcare", count: "900+ jobs", desc: "Support communities through essential caregiving roles." }
-          ].map((cat, idx) => (
+          {categories.map((cat, idx) => (
             <div key={idx} onClick={() => navigate(`/jobs?category=${encodeURIComponent(cat.name)}`)} className="group relative rounded-3xl p-[1px] overflow-hidden cursor-pointer transition-transform duration-500 hover:-translate-y-2 hover:shadow-[0_15px_40px_-10px_rgba(92,177,68,0.3)]">
 
               {/* Animated Gradient Border (visible on hover) */}
@@ -181,7 +196,9 @@ export default function Home() {
 
                 {/* Bottom Content / Count */}
                 <div className="relative z-20 mt-auto pt-5 border-t border-white/5 flex justify-between items-center group-hover:border-white/10 transition-colors duration-300">
-                  <span className="text-sm font-medium text-gray-500 group-hover:text-[#5CB144] transition-colors duration-300">{cat.count}</span>
+                  <span className="text-sm font-medium text-gray-500 group-hover:text-[#5CB144] transition-colors duration-300">
+                    {counts[cat.name] || 0} jobs
+                  </span>
                   <span className="text-[#5CB144] text-lg font-bold opacity-0 -translate-x-4 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-500 delay-75">
                     →
                   </span>

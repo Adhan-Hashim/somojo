@@ -357,3 +357,65 @@ exports.sendJobSavedNotification = async (seekerEmail, seekerName, job) => {
         console.error("Error sending job saved notification:", error);
     }
 };
+
+/**
+ * Send the agreement draft to the candidate for review
+ */
+exports.sendAgreementToCandidate = async (seekerEmail, seekerName, job, agreementContent) => {
+    const dashboardUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/dashboard`;
+    const mailOptions = {
+        from: `"Somojo Agreements" <${process.env.SMTP_USER || 'no-reply@somojo.com'}>`,
+        to: seekerEmail,
+        subject: `ACTION REQUIRED: Employment Agreement for ${job.title}`,
+        html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; border: 1px solid #CF9EFF; border-radius: 10px; padding: 20px;">
+                <h2 style="color: #CF9EFF;">Review Your Agreement</h2>
+                <p>Hi ${seekerName},</p>
+                <p>Congratulations! <strong>${job.company}</strong> has prepared an employment agreement for the <strong>${job.title}</strong> position.</p>
+                <p>Please log in to your dashboard to review the terms and accept the agreement.</p>
+                <div style="margin: 20px 0; text-align: center;">
+                    <a href="${dashboardUrl}" style="background-color: #CF9EFF; color: black; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold;">View & Accept Agreement</a>
+                </div>
+                <p>Best regards,<br/>The Somojo Team</p>
+            </div>
+        `
+    };
+
+    try {
+        if (!transporter) await initTransport();
+        await transporter.sendMail(mailOptions);
+    } catch (error) {
+        console.error("Error sending agreement email:", error);
+    }
+};
+
+/**
+ * Send finalized agreement copies to both parties
+ */
+exports.sendFinalAgreementCopies = async (emails, job, agreementContent) => {
+    const mailOptions = {
+        from: `"Somojo Agreements" <${process.env.SMTP_USER || 'no-reply@somojo.com'}>`,
+        to: emails,
+        subject: `FINALIZED: Signed Agreement for ${job.title}`,
+        html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; border: 1px solid #5CB144; border-radius: 10px; padding: 20px;">
+                <h2 style="color: #5CB144;">Contract Officially Signed! 🎉</h2>
+                <p>This is a finalized copy of the employment agreement between the candidate and the employer for <strong>${job.title}</strong>.</p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;"/>
+                <div style="white-space: pre-wrap; font-family: monospace; background: #f9f9f9; padding: 15px; border-radius: 5px;">
+                    ${agreementContent}
+                </div>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;"/>
+                <p>This document is stored in your Somojo dashboard for future reference.</p>
+                <p>Best regards,<br/>The Somojo Team</p>
+            </div>
+        `
+    };
+
+    try {
+        if (!transporter) await initTransport();
+        await transporter.sendMail(mailOptions);
+    } catch (error) {
+        console.error("Error sending final agreement copies:", error);
+    }
+};

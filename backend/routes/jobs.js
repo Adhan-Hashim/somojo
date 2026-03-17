@@ -10,6 +10,21 @@ const aiService = require('../services/aiService');
 // @access  Public
 router.get('/nearby', (req, res) => require('../controllers/jobController').getNearbyJobs(req, res));
 
+// @route   GET /api/jobs/categories/counts
+// @desc    Get counts of active jobs by category
+// @access  Public
+router.get('/categories/counts', (req, res) => require('../controllers/jobController').getCategoryCounts(req, res));
+
+// @route   GET /api/jobs/related
+// @desc    Get related jobs using AI semantic similarity
+// @access  Public
+router.get('/related', (req, res) => require('../controllers/jobController').getRelatedJobs(req, res));
+
+// @route   POST /api/jobs/bulk-categorize
+// @desc    Bulk re-categorize all jobs using AI (Migration tool)
+// @access  Private (Admin)
+router.post('/bulk-categorize', authMiddleware, (req, res) => require('../controllers/jobController').bulkCategorizeJobs(req, res));
+
 // @route   GET /api/jobs/my-jobs
 // @desc    Get jobs posted by logged in employer
 // @access  Private
@@ -39,17 +54,7 @@ router.get('/recommended', authMiddleware, async (req, res) => {
 // @route   GET /api/jobs/:id
 // @desc    Get job by ID
 // @access  Public
-router.get('/:id', async (req, res) => {
-    try {
-        const job = await Job.findById(req.params.id);
-        if (!job) return res.status(404).json({ message: 'Job not found' });
-        res.json(job);
-    } catch (err) {
-        console.error(err.message);
-        if (err.kind === 'ObjectId') return res.status(404).json({ message: 'Job not found' });
-        res.status(500).json({ message: 'Server Error fetching job details', error: err.message });
-    }
-});
+router.get('/:id', (req, res) => require('../controllers/jobController').getJobById(req, res));
 
 // @route   POST /api/jobs
 // @desc    Create a new job (Legacy direct route)
