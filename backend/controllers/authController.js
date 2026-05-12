@@ -190,7 +190,7 @@ exports.loginUser = async (req, res) => {
             return res.status(400).json({ message: 'Invalid Credentials' });
         }
 
-        // 🔥 ADMIN SECURITY: Force OTP for the official admin email
+        //  ADMIN SECURITY: Force OTP for the official admin email
         if (email === 'showmorejobs@gmail.com' || user.role === 'admin') {
             const otpCode = generateOTP();
             await OTP.findOneAndDelete({ email });
@@ -232,7 +232,7 @@ exports.loginUser = async (req, res) => {
             { expiresIn: '7d' },
             (err, token) => {
                 if (err) throw err;
-                res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+                res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, contact: user.contact, location: user.location } });
             }
         );
     } catch (err) {

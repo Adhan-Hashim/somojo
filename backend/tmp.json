@@ -1,0 +1,135 @@
+[
+  {
+    "t": "ui ux designer",
+    "l": "vadakara"
+  },
+  {
+    "t": "cook",
+    "l": "calicut"
+  },
+  {
+    "t": "cook",
+    "l": "vellimadukunnu"
+  },
+  {
+    "t": "cook",
+    "l": "ഗുരുവായൂർ, Guruvayur, Chavakkad, तृश्शूर, Kerala, India",
+    "c": {
+      "type": "Point",
+      "coordinates": [
+        76.0500096,
+        10.5959204
+      ]
+    }
+  },
+  {
+    "t": "designer",
+    "l": "Vadakara, कोझिकोड, Kerala, India",
+    "c": {
+      "type": "Point",
+      "coordinates": [
+        75.7074935,
+        11.66665
+      ]
+    }
+  },
+  {
+    "t": "designer (posters)",
+    "l": "Kozhikode, कोझिकोड, Kerala, 673001, India",
+    "c": {
+      "type": "Point",
+      "coordinates": [
+        75.7754716,
+        11.2450558
+      ]
+    }
+  },
+  {
+    "t": "developer",
+    "l": "Kozhikode, कोझिकोड, Kerala, 673001, India",
+    "c": {
+      "type": "Point",
+      "coordinates": [
+        75.7754716,
+        11.2450558
+      ]
+    }
+  },
+  {
+    "t": "head chef ",
+    "l": "പേരാമ്പ്ര, കൊയിലാണ്ടി, कोझिकोड, Kerala, 673525, India",
+    "c": {
+      "type": "Point",
+      "coordinates": [
+        75.76,
+        11.56
+      ]
+    }
+  },
+  {
+    "t": "delivery boy",
+    "l": "Vadakara, Kozhikode, Kerala, India",
+    "c": {
+      "type": "Point",
+      "coordinates": [
+        75.7074935,
+        11.66665
+      ]
+    }
+  },
+  {
+    "t": "delivery boy",
+    "l": "Vadakara, Kozhikode, Kerala, India",
+    "c": {
+      "type": "Point",
+      "coordinates": [
+        75.7074935,
+        11.66665
+      ]
+    }
+  },
+  {
+    "t": "art and craft",
+    "l": "Kozhikode, Arbind Gosh Road, Sweetmeat Street, Palayam, Kozhikode, Kerala, 673001, India",
+    "c": {
+      "type": "Point",
+      "coordinates": [
+        75.7803858,
+        11.2459092
+      ]
+    }
+  },
+  {
+    "t": "art and craft",
+    "l": "Kozhikode, Arbind Gosh Road, Sweetmeat Street, Palayam, Kozhikode, Kerala, 673001, India",
+    "c": {
+      "type": "Point",
+      "coordinates": [
+        75.7803858,
+        11.2459092
+      ]
+    }
+  },
+  {
+    "t": "art and craft",
+    "l": "Kozhikode, Arbind Gosh Road, Sweetmeat Street, Palayam, Kozhikode, Kerala, 673001, India",
+    "c": {
+      "type": "Point",
+      "coordinates": [
+        75.7803858,
+        11.2459092
+      ]
+    }
+  },
+  {
+    "t": "art and craft",
+    "l": "Kozhikode, Arbind Gosh Road, Sweetmeat Street, Palayam, Kozhikode, Kerala, 673001, India",
+    "c": {
+      "type": "Point",
+      "coordinates": [
+        75.7803858,
+        11.2459092
+      ]
+    }
+  }
+]

@@ -3,16 +3,108 @@ const User = require('../models/User');
 const aiService = require('../services/aiService');
 const emailService = require('../services/emailService');
 const locationService = require('../services/locationService');
+const Profile = require('../models/Profile');
+
+/**
+ * Calculates a basic relevance score (0-100) between a search query and a job.
+ * This provides the data for the 'Sort by Relevance' frontend feature.
+ */
+const calculateRelevance = (job, query = "", userProfile = null) => {
+    let score = 0;
+    const q = query.toLowerCase().trim();
+    if (!q) return 0;
+
+    const title = (job.title || "").toLowerCase();
+    const company = (job.company || "").toLowerCase();
+    const description = (job.description || "").toLowerCase();
+    const category = (job.category || "").toLowerCase();
+
+    // 1. Exact Title Match (High Priority)
+    if (title === q) score += 100;
+    else if (title.includes(q)) score += 80;
+
+    // 2. Partial Title Match (e.g. "Video Editor" matching "Video")
+    const queryWords = q.split(/\s+/);
+    queryWords.forEach(word => {
+        if (title.includes(word)) score += 20;
+        if (company.includes(word)) score += 10;
+        if (category.includes(word)) score += 15;
+    });
+
+    // 3. Keyword Density in description
+    const descMatches = (description.match(new RegExp(q, "gi")) || []).length;
+    score += Math.min(descMatches * 5, 20);
+
+    // 4. Personalized candidate match (Bonus if user skills match job category/title)
+    if (userProfile && userProfile.skills) {
+        let skillMatches = 0;
+        userProfile.skills.forEach(skill => {
+            const s = skill.toLowerCase();
+            if (title.includes(s) || category.includes(s) || description.includes(s)) {
+                skillMatches++;
+            }
+        });
+        score += Math.min(skillMatches * 10, 30);
+    }
+
+    return Math.min(score, 100);
+};
 
 // @desc    Get all active jobs
 // @route   GET /api/jobs
 // @access  Public or Private
 exports.getJobs = async (req, res) => {
     try {
-        const jobs = await Job.find({ status: 'active' })
+        const { location, q, category } = req.query;
+        const matchQuery = { status: 'active' };
+
+        if (q) {
+            matchQuery.$or = [
+                { title: { $regex: q, $options: 'i' } },
+                { company: { $regex: q, $options: 'i' } },
+                { description: { $regex: q, $options: 'i' } }
+            ];
+        }
+
+        if (category) {
+            matchQuery.category = { $regex: category, $options: 'i' };
+        }
+
+        if (location) {
+            // Case-insensitive regex match on the location field
+            // We split by commas and take the first part (usually the city) to try a broader match if the full string fails
+            const locationParts = location.split(',').map(p => p.trim()).filter(p => p);
+            const mainLocation = locationParts[0];
+            
+            matchQuery.$or = matchQuery.$or || [];
+            matchQuery.$or.push({ location: { $regex: location, $options: 'i' } });
+            if (mainLocation && mainLocation !== location) {
+                matchQuery.$or.push({ location: { $regex: mainLocation, $options: 'i' } });
+            }
+        }
+
+        const jobsList = await Job.find(matchQuery)
             .populate('postedBy', ['name', 'email'])
             .sort({ createdAt: -1 });
-        res.json(jobs);
+
+        // Calculate relevance scores for each job
+        let userProfile = null;
+        if (req.user && req.user.role === 'job-seeker') {
+            userProfile = await Profile.findOne({ user: req.user.id });
+        }
+
+        const jobsWithScores = jobsList.map(job => {
+            const jobObj = job.toObject();
+            jobObj.aiMatchScore = calculateRelevance(jobObj, q || category || "", userProfile);
+            return jobObj;
+        });
+
+        // If a search query or category is provided, we sort by relevance by default for better user experience
+        if (q || category) {
+            jobsWithScores.sort((a, b) => b.aiMatchScore - a.aiMatchScore);
+        }
+
+        res.json(jobsWithScores);
     } catch (err) {
         console.error("[getJobs] ERROR:", err.message);
         res.status(500).json({ message: 'Server Error fetching active jobs', error: err.message });
@@ -38,10 +130,61 @@ exports.getMyJobs = async (req, res) => {
 // @access  Public
 exports.getNearbyJobs = async (req, res) => {
     try {
-        let { lng, lat, maxDistance = 50, q, category } = req.query;
+        let { lng, lat, location, maxDistance = 50, q, category } = req.query;
 
         if (!lng || !lat) {
-            return res.status(400).json({ message: "Longitude and Latitude are required" });
+            if (!location) {
+                return res.status(400).json({ message: "Longitude/Latitude or a location string is required" });
+            }
+            const coords = await locationService.geocodeLocationWithAI(location);
+            if (!coords) {
+                console.log(`[getNearbyJobs] AI Geocoding failed for "${location}". Falling back to text-based search.`);
+                
+                const fallbackMatchQuery = { status: 'active' };
+                if (q) {
+                    fallbackMatchQuery.$or = [
+                        { title: { $regex: q, $options: 'i' } },
+                        { company: { $regex: q, $options: 'i' } },
+                        { description: { $regex: q, $options: 'i' } }
+                    ];
+                }
+                if (category) {
+                    fallbackMatchQuery.category = { $regex: category, $options: 'i' };
+                }
+
+                // Apply location filter to fallback
+                const locationParts = location.split(',').map(p => p.trim()).filter(p => p);
+                const mainLocation = locationParts[0];
+                
+                fallbackMatchQuery.$or = fallbackMatchQuery.$or || [];
+                fallbackMatchQuery.$or.push({ location: { $regex: location, $options: 'i' } });
+                if (mainLocation && mainLocation !== location) {
+                    fallbackMatchQuery.$or.push({ location: { $regex: mainLocation, $options: 'i' } });
+                }
+
+                const fallbackJobsList = await Job.find(fallbackMatchQuery)
+                    .populate('postedBy', ['name', 'email'])
+                    .sort({ createdAt: -1 });
+                
+                // Score fallback jobs
+                let userProfileFallback = null;
+                if (req.user && req.user.role === 'job-seeker') {
+                    userProfileFallback = await Profile.findOne({ user: req.user.id });
+                }
+
+                const fallbackWithScores = fallbackJobsList.map(job => {
+                    const jobObj = job.toObject();
+                    jobObj.aiMatchScore = calculateRelevance(jobObj, q || category || "", userProfileFallback);
+                    return jobObj;
+                });
+
+                // Always sort by score for fallback since it's a direct text search
+                fallbackWithScores.sort((a, b) => b.aiMatchScore - a.aiMatchScore);
+                
+                return res.json(fallbackWithScores);
+            }
+            lng = coords[0];
+            lat = coords[1];
         }
 
         // Distance in meters (1 km = 1000 meters)
@@ -92,7 +235,22 @@ exports.getNearbyJobs = async (req, res) => {
             }
         ]);
 
-        res.json(jobs);
+        // Score geoNear jobs
+        let userProfileGeo = null;
+        if (req.user && req.user.role === 'job-seeker') {
+            userProfileGeo = await Profile.findOne({ user: req.user.id });
+        }
+
+        const geoJobsWithScores = jobs.map(job => {
+            // job is an object from aggregation
+            job.aiMatchScore = calculateRelevance(job, q || category || "", userProfileGeo);
+            return job;
+        });
+
+        // Always prioritize relevance score for sorting
+        geoJobsWithScores.sort((a, b) => b.aiMatchScore - a.aiMatchScore);
+
+        res.json(geoJobsWithScores);
     } catch (err) {
         console.error("[getNearbyJobs] ERROR:", err.message);
         res.status(500).json({ message: 'Server Error fetching nearby jobs', error: err.message });

@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { MapPinHouse } from 'lucide-react';
 
 import api from '../api';
+import LocationInput from '../components/LocationInput';
 
 // For fallback UI if API is empty
 const generateMockJobs = (query, location, category) => {
@@ -66,6 +67,7 @@ export default function Jobs() {
         type: new Set(),
         distance: 'Within 15 miles'
     });
+    const [sortBy, setSortBy] = useState('relevance');
 
     useEffect(() => {
         const fetchJobs = async () => {
@@ -73,25 +75,32 @@ export default function Jobs() {
             setRelatedJobs([]);
             try {
                 let res;
-                // If we have coordinates, ALWAYS use the nearby API for any distance filter
-                if (userCoords && activeFilters.distance) {
+                // If we have distance filter AND (coordinates OR location string)
+                const locParam = searchParams.get('loc');
+                if (activeFilters.distance && (userCoords || locParam)) {
                     let km = 0;
                     if (activeFilters.distance === 'Exact location') {
                         km = 3; // Strict 3-km radius for "Exact"
                     } else {
-                        km = parseInt(activeFilters.distance.match(/\d+/) || [0])[0];
+                        const match = activeFilters.distance.match(/\d+/);
+                        km = match ? parseInt(match[0], 10) : 0;
                     }
                     
                     const meters = km * 1000;
-                    res = await api.get('/api/jobs/nearby', {
-                        params: { 
-                            lng: userCoords.lng, 
-                            lat: userCoords.lat, 
-                            maxDistance: meters,
-                            q: searchParams.get('q'),
-                            category: categoryParam
-                        }
-                    });
+                    const paramsObj = {
+                        maxDistance: meters,
+                        q: searchParams.get('q'),
+                        category: categoryParam
+                    };
+
+                    if (userCoords) {
+                        paramsObj.lng = userCoords.lng;
+                        paramsObj.lat = userCoords.lat;
+                    } else {
+                        paramsObj.location = locParam;
+                    }
+
+                    res = await api.get('/api/jobs/nearby', { params: paramsObj });
                 } else if (user && user.role === 'job-seeker' && !searchParams.get('q') && !categoryParam && !searchParams.get('loc')) {
                     res = await api.get('/api/jobs/recommended');
                 } else {
@@ -110,10 +119,6 @@ export default function Jobs() {
                 if (searchParams.get('q')) {
                     const q = searchParams.get('q').toLowerCase();
                     results = results.filter(j => j.title.toLowerCase().includes(q) || j.company.toLowerCase().includes(q));
-                }
-                if (searchParams.get('loc')) {
-                    const l = searchParams.get('loc').toLowerCase();
-                    results = results.filter(j => j.location.toLowerCase().includes(l));
                 }
                 if (categoryParam) {
                     const c = categoryParam.toLowerCase();
@@ -186,6 +191,36 @@ export default function Jobs() {
         setActiveFilters({ ...activeFilters, type: newSet });
     };
 
+    const extractPay = (str) => {
+        if (!str) return 0;
+        let num = 0;
+        const match = str.match(/[\d,]+/);
+        if (match) num = parseInt(match[0].replace(/,/g, ''), 10);
+        const lower = str.toLowerCase();
+        if (lower.includes('hr') || lower.includes('hour')) num *= 2080;
+        if (lower.includes('month') || lower.includes('mo')) num *= 12;
+        return num;
+    };
+
+    const sortedJobs = [...jobs].sort((a, b) => {
+        if (sortBy === 'relevance') {
+            return (b.aiMatchScore || 0) - (a.aiMatchScore || 0);
+        } else if (sortBy === 'date_newest') {
+            return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+        } else if (sortBy === 'date_oldest') {
+            return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
+        } else if (sortBy === 'pay_highest') {
+            return extractPay(b.pay || b.salary) - extractPay(a.pay || a.salary);
+        } else if (sortBy === 'pay_lowest') {
+            return extractPay(a.pay || a.salary) - extractPay(b.pay || b.salary);
+        } else if (sortBy === 'name_asc') {
+            return (a.title || '').localeCompare(b.title || '');
+        } else if (sortBy === 'name_desc') {
+            return (b.title || '').localeCompare(a.title || '');
+        }
+        return 0;
+    });
+
     return (
         <div className="min-h-screen text-white pb-32 pt-24 relative overflow-hidden">
 
@@ -231,34 +266,35 @@ export default function Jobs() {
                         </span>
                         <div className="flex-1 text-left">
                             <label className="block text-[10px] font-bold text-[#5CB144]/70 uppercase tracking-widest mb-0.5">Where do you want to work?</label>
-                            <div className="flex items-center">
-                                <input
-                                    type="text"
-                                    value={locationInput}
-                                    onChange={(e) => setLocationInput(e.target.value)}
-                                    placeholder="Your city or neighborhood"
-                                    className="w-full bg-transparent text-white focus:outline-none text-base md:text-lg placeholder-gray-500 font-medium"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={handleLocateMe}
-                                    disabled={isLocating}
-                                    className="ml-2 px-3 py-1.5 text-[#5CB144] hover:text-white bg-[#5CB144]/10 hover:bg-[#5CB144]/20 rounded-xl transition border border-[#5CB144]/20 flex items-center justify-center cursor-pointer whitespace-nowrap text-sm font-bold shadow-md"
-                                    title="Detect my location"
-                                >
-                                    {isLocating ? (
-                                        <span className="animate-pulse">Locating...</span>
-                                    ) : (
-                                        <div className="flex items-center gap-2">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                                                <path d="M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10zm0-7a3 3 0 1 1 0-6 3 3 0 0 1 0 6z" />
-                                            </svg>
-                                            Locate
-                                        </div>
-                                    )}
-                                </button>
-                            </div>
+                            <LocationInput
+                                value={locationInput}
+                                onChange={setLocationInput}
+                                onLocationSelect={({ lat, lng, address }) => {
+                                    setLocationInput(address);
+                                    setUserCoords({ lat, lng });
+                                }}
+                                placeholder="Your city or neighborhood"
+                                className="w-full bg-transparent text-white focus:outline-none text-base md:text-lg placeholder-gray-500 font-medium"
+                            />
                         </div>
+                        <button
+                            type="button"
+                            onClick={handleLocateMe}
+                            disabled={isLocating}
+                            className="ml-2 px-3 py-1.5 text-[#5CB144] hover:text-white bg-[#5CB144]/10 hover:bg-[#5CB144]/20 rounded-xl transition border border-[#5CB144]/20 flex items-center justify-center cursor-pointer whitespace-nowrap text-sm font-bold shadow-md shrink-0"
+                            title="Detect my location"
+                        >
+                            {isLocating ? (
+                                <span className="animate-pulse">Locating...</span>
+                            ) : (
+                                <div className="flex items-center gap-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                        <path d="M8 16s6-5.686 6-10A6 6 0 0 0 2 6c0 4.314 6 10 6 10zm0-7a3 3 0 1 1 0-6 3 3 0 0 1 0 6z" />
+                                    </svg>
+                                    Locate
+                                </div>
+                            )}
+                        </button>
                     </div>
 
                     <button
@@ -318,7 +354,7 @@ export default function Jobs() {
                                         key={dist} 
                                         onClick={() => {
                                             setActiveFilters({ ...activeFilters, distance: dist });
-                                            if (!userCoords) {
+                                            if (!userCoords && !searchParams.get('loc')) {
                                                 handleLocateMe();
                                             }
                                         }} 
@@ -344,10 +380,18 @@ export default function Jobs() {
                             {isSearching ? 'Scanning network...' : `${jobs.length} Matches Found`}
                         </p>
                         {!isSearching && jobs.length > 0 && (
-                            <select className="bg-white/5 border border-white/10 text-white rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-[#CF9EFF]/50 cursor-pointer">
-                                <option className="bg-[#111]">Sort by Relevance</option>
-                                <option className="bg-[#111]">Sort by Date (Newest)</option>
-                                <option className="bg-[#111]">Sort by Pay (Highest)</option>
+                            <select 
+                                value={sortBy}
+                                onChange={(e) => setSortBy(e.target.value)}
+                                className="bg-white/5 border border-white/10 text-white rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-[#CF9EFF]/50 cursor-pointer"
+                            >
+                                <option value="relevance" className="bg-[#111]">Sort by Relevance</option>
+                                <option value="date_newest" className="bg-[#111]">Date (Newest)</option>
+                                <option value="date_oldest" className="bg-[#111]">Date (Oldest)</option>
+                                <option value="pay_highest" className="bg-[#111]">Pay (Highest)</option>
+                                <option value="pay_lowest" className="bg-[#111]">Pay (Lowest)</option>
+                                <option value="name_asc" className="bg-[#111]">Name (A-Z)</option>
+                                <option value="name_desc" className="bg-[#111]">Name (Z-A)</option>
                             </select>
                         )}
                     </div>
@@ -367,7 +411,7 @@ export default function Jobs() {
                                 </div>
                             ))
                         ) : jobs.length > 0 ? (
-                            jobs.map((job) => (
+                            sortedJobs.map((job) => (
                                 <div
                                     key={job._id || job.id}
                                     className="group relative bg-[#0a0a0a]/90 backdrop-blur-2xl border border-white/10 rounded-[30px] p-6 sm:p-8 overflow-hidden transition-all duration-500 hover:-translate-y-1 hover:border-[#CF9EFF]/40 hover:shadow-[0_20px_50px_-10px_rgba(207,158,255,0.15)]"

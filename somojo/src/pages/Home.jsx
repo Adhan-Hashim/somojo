@@ -4,6 +4,15 @@ import { MapPinHouse, Search } from "lucide-react";
 import api from "../api";
 import LocationInput from "../components/LocationInput";
 
+import imgRetail from "../assets/retail.jpg";
+import imgFood from "../assets/food.jpg";
+import imgWarehouse from "../assets/warehouse.jpg";
+import imgSupport from "../assets/support.jpg";
+import imgDelivery from "../assets/delivery.jpg";
+import imgFacilities from "../assets/facilities.jpg";
+import imgEvents from "../assets/events.jpg";
+import imgHealth from "../assets/health.jpg";
+
 export default function Home() {
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem("user") || "null");
@@ -11,16 +20,17 @@ export default function Home() {
   const [location, setLocation] = useState("");
   const [isLocating, setIsLocating] = useState(false);
   const [counts, setCounts] = useState({});
+  const [suggestedJobs, setSuggestedJobs] = useState([]);
 
   const categories = [
-    { icon: "🛍️", name: "Retail & Sales", desc: "Customer-facing roles in vibrant local shops and malls." },
-    { icon: "🍔", name: "Restaurant & Food", desc: "Fast-paced opportunities in kitchens, cafes, and dining." },
-    { icon: "📦", name: "Warehouse", desc: "Active roles in packing, sorting, and inventory supply." },
-    { icon: "💻", name: "Customer Support", desc: "Help users succeed with excellent communication skills." },
-    { icon: "🚗", name: "Delivery & Driver", desc: "Hit the road and deliver goods with flexible hours." },
-    { icon: "🧹", name: "Facilities", desc: "Maintain pristine environments in offices and homes." },
-    { icon: "🎉", name: "Events", desc: "Be part of the excitement at concerts and festivals." },
-    { icon: "🏥", name: "Healthcare", desc: "Support communities through essential caregiving roles." }
+    { icon: "🛍️", name: "Retail & Sales", desc: "Customer-facing roles in vibrant local shops and malls.", bg: imgRetail },
+    { icon: "🍔", name: "Restaurant & Food", desc: "Fast-paced opportunities in kitchens, cafes, and dining.", bg: imgFood },
+    { icon: "📦", name: "Warehouse", desc: "Active roles in packing, sorting, and inventory supply.", bg: imgWarehouse },
+    { icon: "💻", name: "Customer Support", desc: "Help users succeed with excellent communication skills.", bg: imgSupport },
+    { icon: "🚗", name: "Delivery & Driver", desc: "Hit the road and deliver goods with flexible hours.", bg: imgDelivery },
+    { icon: "🧹", name: "Facilities", desc: "Maintain pristine environments in offices and homes.", bg: imgFacilities },
+    { icon: "🎉", name: "Events", desc: "Be part of the excitement at concerts and festivals.", bg: imgEvents },
+    { icon: "🏥", name: "Healthcare", desc: "Support communities through essential caregiving roles.", bg: imgHealth }
   ];
 
   useEffect(() => {
@@ -33,6 +43,43 @@ export default function Home() {
       }
     };
     fetchCounts();
+  }, []);
+
+  const [userLocation, setUserLocation] = useState(user?.location || "");
+
+  useEffect(() => {
+    let isMounted = true;
+    const initLocationAndFetch = async () => {
+      let loc = user?.location;
+      
+      // If user is logged in but location isn't stored locally, fetch it from backend
+      if (user && !loc) {
+        try {
+          const res = await api.get("/api/auth/me");
+          if (res.data?.location) {
+            loc = res.data.location;
+            const updatedUser = { ...user, location: loc };
+            localStorage.setItem("user", JSON.stringify(updatedUser)); // Update for future
+          }
+        } catch (err) {
+          console.error("Could not fetch user location", err);
+        }
+      }
+
+      if (loc) {
+        setUserLocation(loc);
+        try {
+          const res = await api.get(`/api/jobs?location=${encodeURIComponent(loc)}`);
+          if (isMounted) {
+            setSuggestedJobs(res.data.slice(0, 4));
+          }
+        } catch (err) {
+          console.error("Error fetching suggestions:", err);
+        }
+      }
+    };
+    initLocationAndFetch();
+    return () => { isMounted = false; };
   }, []);
 
   const handleLocateMe = () => {
@@ -167,6 +214,49 @@ export default function Home() {
         </div>
       </div>
 
+      {/* Suggested Jobs */}
+      {user && (
+        <div className="max-w-6xl mx-auto px-6 mt-16 relative z-10">
+          <div className="flex justify-between items-end mb-8">
+            <div>
+              <h2 className="text-2xl font-bold">Suggested Jobs</h2>
+              <p className="text-gray-400 mt-1">Based on your location: {userLocation || "Loading location..."}</p>
+            </div>
+            {userLocation && (
+              <button onClick={() => navigate(`/jobs?loc=${encodeURIComponent(userLocation)}`)} className="text-[#5CB144] hover:text-white transition font-medium text-sm">
+                View all →
+              </button>
+            )}
+          </div>
+          
+          {suggestedJobs.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {suggestedJobs.map(job => (
+                <div key={job._id} onClick={() => navigate(`/jobs/${job._id}`)} className="bg-[#0a0a0a] p-6 rounded-3xl border border-white/5 hover:border-[#5CB144]/50 cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg hover:shadow-[#5CB144]/10 flex flex-col justify-between min-h-[160px]">
+                  <div>
+                    <h3 className="font-bold text-lg mb-1 line-clamp-2 text-white">{job.title}</h3>
+                    <p className="text-gray-400 text-sm mb-3">{job.company}</p>
+                  </div>
+                  <div className="flex justify-between items-center mt-auto pt-4 border-t border-white/5">
+                    <span className="text-sm font-medium text-[#5CB144] truncate pr-2">{job.salary || "Competitive"}</span>
+                    <span className="text-xs text-gray-500 whitespace-nowrap">{job.type}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-[#0a0a0a] border border-white/5 rounded-3xl p-12 flex flex-col items-center justify-center text-center">
+               <MapPinHouse className="w-12 h-12 text-[#5CB144]/50 mb-4" />
+               <h3 className="text-xl font-bold text-white mb-2">No local jobs right now</h3>
+               <p className="text-gray-400 max-w-md">We couldn't find any active jobs in {userLocation || "your area"} at the moment. Keep an eye out or explore other categories!</p>
+               <button onClick={() => navigate('/jobs')} className="mt-6 px-6 py-2 bg-white/5 hover:bg-[#5CB144]/10 text-white hover:text-[#5CB144] rounded-full transition border border-white/10 hover:border-[#5CB144]/30 text-sm font-medium">
+                 Browse all jobs
+               </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Featured Categories */}
       <div className="max-w-6xl mx-auto px-6 mt-16 relative z-10">
         <h2 className="text-2xl font-bold mb-8">Browse Categories</h2>
@@ -179,33 +269,39 @@ export default function Home() {
               <div className="absolute inset-0 bg-gradient-to-br from-[#5CB144] via-[#5CB144] to-[#5CB144] opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-0"></div>
 
               {/* Inner Dark Card */}
-              <div className="relative z-10 h-full bg-[#0a0a0a]/95 backdrop-blur-xl rounded-[23px] p-6 flex flex-col justify-between border border-white/5 group-hover:border-transparent transition-colors duration-500">
+              <div className="relative z-10 h-full min-h-[300px] bg-[#0a0a0a] rounded-[23px] flex flex-col justify-between border border-white/5 group-hover:border-white/10 transition-all duration-500 overflow-hidden">
+                
+                {/* Background Image Layer */}
+                <div 
+                  className="absolute inset-0 transition-all duration-700 group-hover:scale-105 opacity-50 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                  style={{ backgroundImage: `url(${cat.bg})`, backgroundSize: "cover", backgroundPosition: "center" }}
+                ></div>
+
+                {/* Dark Gradient Overlay to ensure text readability */}
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/90 to-transparent z-0 pointer-events-none"></div>
 
                 {/* Top Content */}
-                <div className="relative z-20">
-                  <div className="w-14 h-14 rounded-full bg-white/5 flex items-center justify-center text-2xl mb-6 group-hover:scale-110 group-hover:bg-[#5CB144]/20 transition-all duration-500">
-                    {cat.icon}
-                  </div>
-                  <h3 className="font-bold text-xl mb-3 text-white group-hover:text-[#5CB144] transition-colors duration-300">
+                <div className="relative z-20 p-6 pb-0 flex-1 flex flex-col justify-end">
+                  <h3 className="font-bold text-2xl mb-2 text-white group-hover:text-[#5CB144] transition-colors duration-300 drop-shadow-md">
                     {cat.name}
                   </h3>
-                  <p className="text-sm text-gray-400 leading-relaxed mb-8 group-hover:text-gray-300 transition-colors duration-300">
+                  <p className="text-sm text-gray-300 leading-relaxed mb-6 group-hover:text-white transition-colors duration-300 drop-shadow-md">
                     {cat.desc}
                   </p>
                 </div>
 
                 {/* Bottom Content / Count */}
-                <div className="relative z-20 mt-auto pt-5 border-t border-white/5 flex justify-between items-center group-hover:border-white/10 transition-colors duration-300">
-                  <span className="text-sm font-medium text-gray-500 group-hover:text-[#5CB144] transition-colors duration-300">
+                <div className="relative z-20 mt-auto pt-5 pb-6 px-6 border-t border-white/10 flex justify-between items-center group-hover:border-white/20 transition-colors duration-300 bg-gradient-to-t from-black/60 to-transparent">
+                  <span className="text-sm font-bold text-gray-400 group-hover:text-[#5CB144] transition-colors duration-300">
                     {counts[cat.name] || 0} jobs
                   </span>
-                  <span className="text-[#5CB144] text-lg font-bold opacity-0 -translate-x-4 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-500 delay-75">
+                  <span className="text-[#5CB144] text-lg font-bold opacity-0 -translate-x-4 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-500 delay-75 drop-shadow-[0_0_10px_rgba(92,177,68,0.8)]">
                     →
                   </span>
                 </div>
 
                 {/* Hover Glow Effect Inside */}
-                <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-[#5CB144]/15 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"></div>
+                <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-[#5CB144]/20 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none z-10"></div>
               </div>
             </div>
           ))}
