@@ -15,7 +15,7 @@ import StudentDashboard from "./pages/StudentDashboard";
 import EmployerDashboard from "./pages/EmployerDashboard";
 import EmployerApplications from './pages/EmployerApplications';
 import SmartInterview from "./pages/SmartInterview";
-import Login from "./pages/Login";
+import Login from "./pages/login";
 import Register from "./pages/Register";
 import Careers from "./pages/Careers";
 import Pricing from "./pages/Pricing";
